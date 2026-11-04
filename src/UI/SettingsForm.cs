@@ -5,6 +5,7 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Text;
 using System.Windows.Forms;
 using MetriX.Model;
+using MetriX.Native;
 using MetriX.Services;
 
 namespace MetriX.UI
@@ -17,40 +18,50 @@ namespace MetriX.UI
 
         private AppConfig _workingConfig;
 
-        // UI Controls
+        // UI Architecture: Left Nav + Content Pages
+        private Panel _navRail;
+        private Panel _contentContainer;
+        private readonly List<Button> _navButtons = new List<Button>();
+        private readonly List<Panel> _pages = new List<Panel>();
+        private int _selectedPageIndex = 0;
+
+        // Header Live Preview
         private Panel _previewPanel;
+
+        // Controls - Page 0: Position & Layout
         private ComboBox _cbPosition;
-        private NumericUpDown _nudOffsetX;
-        private NumericUpDown _nudOffsetY;
-        private CheckBox _chkAllMonitors;
-
         private ComboBox _cbLayout;
+        private FluentNumericStepper _stepperOffsetX;
+        private FluentNumericStepper _stepperOffsetY;
+        private FluentToggleSwitch _toggleAllMonitors;
+
+        // Controls - Page 1: Typography & Colors
         private ComboBox _cbFont;
-        private NumericUpDown _nudFontSize;
-        private NumericUpDown _nudUnitFontSize;
-        private CheckBox _chkFontBold;
+        private FluentNumericStepper _stepperFontSize;
+        private FluentNumericStepper _stepperUnitFontSize;
+        private FluentToggleSwitch _toggleFontBold;
+        private FluentToggleSwitch _toggleAutoTheme;
+        private Panel _chipUploadColor;
+        private Panel _chipDownloadColor;
+        private Panel _chipLabelColor;
+        private FluentToggleSwitch _toggleHoverHighlight;
 
-        private CheckBox _chkAutoTheme;
-        private Button _btnUploadColor;
-        private Button _btnDownloadColor;
-        private Button _btnLabelColor;
-        private CheckBox _chkHoverHighlight;
-
-        private CheckBox _chkIdleDimming;
-        private NumericUpDown _nudIdleOpacity;
-        private NumericUpDown _nudOverallOpacity;
-
+        // Controls - Page 2: Spacing & Geometry
         private ComboBox _cbArrowStyle;
         private ComboBox _cbUnitMode;
-        private NumericUpDown _nudDecimals;
-        private NumericUpDown _nudPaddingX;
-        private NumericUpDown _nudPaddingY;
-        private NumericUpDown _nudSpacing;
+        private FluentNumericStepper _stepperDecimals;
+        private FluentNumericStepper _stepperPaddingX;
+        private FluentNumericStepper _stepperPaddingY;
+        private FluentNumericStepper _stepperSpacing;
+        private FluentNumericStepper _stepperOverallOpacity;
+        private FluentToggleSwitch _toggleIdleDimming;
+        private FluentNumericStepper _stepperIdleOpacity;
 
+        // Controls - Page 3: System & Network
         private ComboBox _cbAdapter;
         private ComboBox _cbRefreshInterval;
-        private CheckBox _chkStartWithWindows;
         private ComboBox _cbLeftClickAction;
+        private FluentToggleSwitch _toggleStartWithWindows;
 
         public SettingsForm(ConfigService configService, NetworkMonitor networkMonitor, Action onSettingsUpdated)
         {
@@ -60,8 +71,40 @@ namespace MetriX.UI
 
             _workingConfig = CloneConfig(_configService.Config);
 
-            InitializeComponent();
+            InitializeFluentWindow();
+            BuildNavigationRail();
+            BuildContentPages();
+            BuildBottomActionBar();
             PopulateValues();
+
+            SwitchPage(0);
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            ApplyDwmStyling();
+        }
+
+        private void ApplyDwmStyling()
+        {
+            try
+            {
+                // Enable Windows 11 Immersive Dark Mode for title bar
+                int darkMode = 1;
+                NativeMethods.DwmSetWindowAttribute(Handle, NativeMethods.DWMWA_USE_IMMERSIVE_DARK_MODE, ref darkMode, sizeof(int));
+
+                // Assert Windows 11 12px rounded corners
+                int cornerPreference = NativeMethods.DWMWCP_ROUND;
+                NativeMethods.DwmSetWindowAttribute(Handle, NativeMethods.DWMWA_WINDOW_CORNER_PREFERENCE, ref cornerPreference, sizeof(int));
+
+                // Request Mica / Acrylic backdrop
+                int backdrop = NativeMethods.DWMSBT_MAINWINDOW;
+                NativeMethods.DwmSetWindowAttribute(Handle, NativeMethods.DWMWA_SYSTEMBACKDROP_TYPE, ref backdrop, sizeof(int));
+            }
+            catch
+            {
+            }
         }
 
         private static AppConfig CloneConfig(AppConfig src)
@@ -99,16 +142,16 @@ namespace MetriX.UI
             };
         }
 
-        private void InitializeComponent()
+        private void InitializeFluentWindow()
         {
-            Text = "metriX Settings & Customization";
-            Width = 560;
-            Height = 695;
+            Text = "metriX Settings";
+            Width = 740;
+            Height = 640;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
-            BackColor = Color.FromArgb(32, 32, 32);
+            BackColor = Color.FromArgb(28, 28, 30);
             ForeColor = Color.FromArgb(240, 240, 240);
             Font = new Font("Segoe UI", 9.0f, FontStyle.Regular);
 
@@ -118,442 +161,816 @@ namespace MetriX.UI
                 else Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
             }
             catch { }
+        }
 
-            // Live Preview Card
-            var previewGroup = new GroupBox
+        private void BuildNavigationRail()
+        {
+            _navRail = new Panel
             {
-                Text = "Live Preview (Interactive)",
-                Left = 16,
-                Top = 12,
-                Width = 512,
-                Height = 88,
-                ForeColor = Color.FromArgb(200, 200, 200)
+                Location = new Point(14, 14),
+                Size = new Size(190, 550),
+                BackColor = Color.FromArgb(24, 24, 26)
             };
+            _navRail.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using (var pen = new Pen(Color.FromArgb(42, 42, 46), 1))
+                {
+                    e.Graphics.DrawRectangle(pen, 0, 0, _navRail.Width - 1, _navRail.Height - 1);
+                }
+            };
+
+            // App Brand Header inside Rail
+            var lblBrand = new Label
+            {
+                Text = "metriX",
+                Font = new Font("Segoe UI", 12.0f, FontStyle.Bold),
+                ForeColor = Color.White,
+                Location = new Point(16, 16),
+                AutoSize = true
+            };
+            var lblSubBrand = new Label
+            {
+                Text = "Taskbar Indicator",
+                Font = new Font("Segoe UI", 7.5f, FontStyle.Regular),
+                ForeColor = Color.FromArgb(140, 140, 145),
+                Location = new Point(17, 38),
+                AutoSize = true
+            };
+            _navRail.Controls.Add(lblBrand);
+            _navRail.Controls.Add(lblSubBrand);
+
+            // Nav category items
+            string[] navTitles = new string[]
+            {
+                "📍 Position & Layout",
+                "🎨 Typography & Colors",
+                "📐 Spacing & Geometry",
+                "⚙️ System & Network"
+            };
+
+            int btnY = 75;
+            for (int i = 0; i < navTitles.Length; i++)
+            {
+                int index = i;
+                var btn = new Button
+                {
+                    Text = "  " + navTitles[i],
+                    Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
+                    ForeColor = Color.FromArgb(210, 210, 215),
+                    BackColor = Color.Transparent,
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    FlatStyle = FlatStyle.Flat,
+                    Size = new Size(174, 40),
+                    Location = new Point(8, btnY),
+                    Cursor = Cursors.Hand
+                };
+                btn.FlatAppearance.BorderSize = 0;
+                btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(38, 38, 42);
+                btn.Click += (s, e) => SwitchPage(index);
+
+                btn.Paint += (s, e) =>
+                {
+                    if (_selectedPageIndex == index)
+                    {
+                        // Blue indicator bar on left
+                        using (var brush = new SolidBrush(Color.FromArgb(0, 120, 215)))
+                        {
+                            e.Graphics.FillRectangle(brush, 0, 8, 3, btn.Height - 16);
+                        }
+                    }
+                };
+
+                _navButtons.Add(btn);
+                _navRail.Controls.Add(btn);
+                btnY += 46;
+            }
+
+            Controls.Add(_navRail);
+        }
+
+        private void SwitchPage(int index)
+        {
+            _selectedPageIndex = index;
+            for (int i = 0; i < _navButtons.Count; i++)
+            {
+                if (i == index)
+                {
+                    _navButtons[i].BackColor = Color.FromArgb(36, 36, 40);
+                    _navButtons[i].ForeColor = Color.White;
+                    _navButtons[i].Font = new Font("Segoe UI", 9.0f, FontStyle.Bold);
+                }
+                else
+                {
+                    _navButtons[i].BackColor = Color.Transparent;
+                    _navButtons[i].ForeColor = Color.FromArgb(190, 190, 195);
+                    _navButtons[i].Font = new Font("Segoe UI", 9.0f, FontStyle.Regular);
+                }
+                _navButtons[i].Invalidate();
+            }
+
+            for (int i = 0; i < _pages.Count; i++)
+            {
+                _pages[i].Visible = (i == index);
+            }
+        }
+
+        private void BuildContentPages()
+        {
+            _contentContainer = new Panel
+            {
+                Location = new Point(216, 14),
+                Size = new Size(495, 550),
+                BackColor = Color.Transparent
+            };
+
+            // Top Live Preview Hero Card
+            var previewCard = new Panel
+            {
+                Location = new Point(0, 0),
+                Size = new Size(495, 78),
+                BackColor = Color.FromArgb(24, 24, 26)
+            };
+            previewCard.Paint += (s, e) =>
+            {
+                using (var pen = new Pen(Color.FromArgb(42, 42, 46), 1))
+                {
+                    e.Graphics.DrawRectangle(pen, 0, 0, previewCard.Width - 1, previewCard.Height - 1);
+                }
+            };
+
+            var lblPreviewHeader = new Label
+            {
+                Text = "LIVE INTERACTIVE PREVIEW",
+                Font = new Font("Segoe UI", 7.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(140, 140, 145),
+                Location = new Point(14, 8),
+                AutoSize = true
+            };
+            previewCard.Controls.Add(lblPreviewHeader);
 
             _previewPanel = new Panel
             {
-                Left = 12,
-                Top = 22,
-                Width = 488,
-                Height = 52,
-                BackColor = Color.FromArgb(24, 24, 24)
+                Location = new Point(14, 26),
+                Size = new Size(467, 44),
+                BackColor = Color.FromArgb(18, 18, 20)
             };
             _previewPanel.Paint += OnPreviewPaint;
-            previewGroup.Controls.Add(_previewPanel);
-            Controls.Add(previewGroup);
+            previewCard.Controls.Add(_previewPanel);
 
-            // Tab Control
-            var tabControl = new TabControl
-            {
-                Left = 16,
-                Top = 108,
-                Width = 512,
-                Height = 480
-            };
+            _contentContainer.Controls.Add(previewCard);
 
-            // 1. Placement Tab
-            var tabPos = new TabPage("Position & Layout") { BackColor = Color.FromArgb(32, 32, 32) };
-            BuildPositionTab(tabPos);
-            tabControl.TabPages.Add(tabPos);
+            // Container for scrollable page contents
+            int pageY = 88;
+            int pageH = 462;
 
-            // 2. Typography & Colors Tab
-            var tabStyle = new TabPage("Typography & Colors") { BackColor = Color.FromArgb(32, 32, 32) };
-            BuildStyleTab(tabStyle);
-            tabControl.TabPages.Add(tabStyle);
+            // Page 0: Position & Layout
+            var pagePos = CreateScrollablePage(pageY, pageH);
+            BuildPositionCards(pagePos);
+            _pages.Add(pagePos);
+            _contentContainer.Controls.Add(pagePos);
 
-            // 3. Spacing & Units Tab
-            var tabGeometry = new TabPage("Spacing & Data") { BackColor = Color.FromArgb(32, 32, 32) };
-            BuildGeometryTab(tabGeometry);
-            tabControl.TabPages.Add(tabGeometry);
+            // Page 1: Typography & Colors
+            var pageStyle = CreateScrollablePage(pageY, pageH);
+            BuildStyleCards(pageStyle);
+            _pages.Add(pageStyle);
+            _contentContainer.Controls.Add(pageStyle);
 
-            // 4. System & Network Tab
-            var tabSystem = new TabPage("System & Network") { BackColor = Color.FromArgb(32, 32, 32) };
-            BuildSystemTab(tabSystem);
-            tabControl.TabPages.Add(tabSystem);
+            // Page 2: Spacing & Geometry
+            var pageSpacing = CreateScrollablePage(pageY, pageH);
+            BuildSpacingCards(pageSpacing);
+            _pages.Add(pageSpacing);
+            _contentContainer.Controls.Add(pageSpacing);
 
-            Controls.Add(tabControl);
+            // Page 3: System & Network
+            var pageSystem = CreateScrollablePage(pageY, pageH);
+            BuildSystemCards(pageSystem);
+            _pages.Add(pageSystem);
+            _contentContainer.Controls.Add(pageSystem);
 
-            // Bottom action buttons
-            var btnApply = new Button
-            {
-                Text = "Save & Apply",
-                Width = 115,
-                Height = 34,
-                Left = 295,
-                Top = 605,
-                BackColor = Color.FromArgb(0, 120, 215),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat
-            };
-            btnApply.Click += (s, e) => ApplyAndClose();
-
-            var btnCancel = new Button
-            {
-                Text = "Cancel",
-                Width = 95,
-                Height = 34,
-                Left = 422,
-                Top = 605,
-                BackColor = Color.FromArgb(48, 48, 48),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat
-            };
-            btnCancel.Click += (s, e) => Close();
-
-            Controls.Add(btnApply);
-            Controls.Add(btnCancel);
+            Controls.Add(_contentContainer);
         }
 
-        private void BuildPositionTab(TabPage page)
+        private Panel CreateScrollablePage(int y, int height)
         {
-            int y = 20;
+            return new Panel
+            {
+                Location = new Point(0, y),
+                Size = new Size(495, height),
+                AutoScroll = true,
+                BackColor = Color.Transparent,
+                Visible = false
+            };
+        }
 
-            AddLabel(page, "Taskbar Position:", 20, y);
-            _cbPosition = new ComboBox { Left = 160, Top = y - 3, Width = 260, DropDownStyle = ComboBoxStyle.DropDownList };
+        private void BuildPositionCards(Panel page)
+        {
+            int y = 6;
+
+            // Card 1: Taskbar Position
+            _cbPosition = CreateStyledComboBox(210);
             _cbPosition.Items.AddRange(new object[] {
-                "Right (Left of System Tray) - Recommended",
+                "Right (Left of System Tray)",
                 "Left (Near Start / Widgets)",
-                "Center (Right of Open Apps)",
-                "Custom Coordinates"
+                "Center (Near Running Apps)"
             });
             _cbPosition.SelectedIndexChanged += (s, e) =>
             {
                 _workingConfig.Position = (PositionMode)_cbPosition.SelectedIndex;
                 _previewPanel.Invalidate();
             };
-            page.Controls.Add(_cbPosition);
-            y += 40;
+            page.Controls.Add(new FluentSettingCard("Taskbar Position", "Anchor indicator relative to taskbar shell icons", _cbPosition) { Location = new Point(0, y) });
+            y += 68;
 
-            AddLabel(page, "Fine-tune X Offset (px):", 20, y);
-            _nudOffsetX = new NumericUpDown { Left = 160, Top = y - 3, Width = 100, Minimum = -2000, Maximum = 2000 };
-            _nudOffsetX.ValueChanged += (s, e) => { _workingConfig.OffsetX = (int)_nudOffsetX.Value; _previewPanel.Invalidate(); };
-            page.Controls.Add(_nudOffsetX);
-            y += 35;
-
-            AddLabel(page, "Fine-tune Y Offset (px):", 20, y);
-            _nudOffsetY = new NumericUpDown { Left = 160, Top = y - 3, Width = 100, Minimum = -100, Maximum = 100 };
-            _nudOffsetY.ValueChanged += (s, e) => { _workingConfig.OffsetY = (int)_nudOffsetY.Value; _previewPanel.Invalidate(); };
-            page.Controls.Add(_nudOffsetY);
-            y += 45;
-
-            AddLabel(page, "Display Layout Mode:", 20, y);
-            _cbLayout = new ComboBox { Left = 160, Top = y - 3, Width = 260, DropDownStyle = ComboBoxStyle.DropDownList };
-            _cbLayout.Items.AddRange(new object[] { "Stacked (Two Rows)", "Horizontal (Single Row)" });
+            // Card 2: Display Layout Mode
+            _cbLayout = CreateStyledComboBox(210);
+            _cbLayout.Items.AddRange(new object[] {
+                "Stacked (Two Rows - Clock Height)",
+                "Horizontal (Single Row)"
+            });
             _cbLayout.SelectedIndexChanged += (s, e) =>
             {
                 _workingConfig.Layout = (LayoutMode)_cbLayout.SelectedIndex;
                 _previewPanel.Invalidate();
             };
-            page.Controls.Add(_cbLayout);
-            y += 40;
+            page.Controls.Add(new FluentSettingCard("Display Layout Mode", "Choose between two-row stacked or single-row display", _cbLayout) { Location = new Point(0, y) });
+            y += 68;
 
-            _chkAllMonitors = new CheckBox
+            // Card 3: Horizontal Offset X
+            _stepperOffsetX = new FluentNumericStepper { Minimum = -2000, Maximum = 2000, Increment = 5, Suffix = " px" };
+            _stepperOffsetX.ValueChanged += (s, e) =>
             {
-                Text = "Mirror indicator on all connected monitors (secondary taskbars)",
-                Left = 20,
-                Top = y,
-                AutoSize = true,
-                ForeColor = Color.FromArgb(230, 230, 230)
+                _workingConfig.OffsetX = (int)_stepperOffsetX.Value;
+                _previewPanel.Invalidate();
             };
-            _chkAllMonitors.CheckedChanged += (s, e) =>
-            {
-                _workingConfig.ShowOnAllMonitors = _chkAllMonitors.Checked;
-            };
-            page.Controls.Add(_chkAllMonitors);
-            y += 35;
+            page.Controls.Add(new FluentSettingCard("Fine-tune Horizontal Offset", "Shift meter horizontally along taskbar", _stepperOffsetX) { Location = new Point(0, y) });
+            y += 68;
 
-            var lblHint = new Label
+            // Card 4: Vertical Offset Y
+            _stepperOffsetY = new FluentNumericStepper { Minimum = -100, Maximum = 100, Increment = 1, Suffix = " px" };
+            _stepperOffsetY.ValueChanged += (s, e) =>
             {
-                Text = "💡 Tip: You can also hold Ctrl + Left Click Drag directly on the taskbar indicator to reposition it freely anywhere on your screen!",
-                Left = 20,
-                Top = y,
-                Width = 430,
-                Height = 60,
-                ForeColor = Color.FromArgb(160, 160, 160)
+                _workingConfig.OffsetY = (int)_stepperOffsetY.Value;
+                _previewPanel.Invalidate();
             };
-            page.Controls.Add(lblHint);
+            page.Controls.Add(new FluentSettingCard("Fine-tune Vertical Offset", "Adjust vertical baseline centering", _stepperOffsetY) { Location = new Point(0, y) });
+            y += 68;
+
+            // Card 5: Multi-Monitor Mirroring
+            _toggleAllMonitors = new FluentToggleSwitch();
+            _toggleAllMonitors.CheckedChanged += (s, e) =>
+            {
+                _workingConfig.ShowOnAllMonitors = _toggleAllMonitors.Checked;
+            };
+            page.Controls.Add(new FluentSettingCard("Multi-Monitor Mirroring", "Mirror synchronized indicator on all secondary display taskbars", _toggleAllMonitors) { Location = new Point(0, y) });
+            y += 68;
         }
 
-        private void BuildStyleTab(TabPage page)
+        private void BuildStyleCards(Panel page)
         {
-            int y = 20;
+            int y = 6;
 
-            AddLabel(page, "Font Family:", 20, y);
-            _cbFont = new ComboBox { Left = 150, Top = y - 3, Width = 270, DropDownStyle = ComboBoxStyle.DropDownList };
+            // Card 1: Font Family
+            _cbFont = CreateStyledComboBox(210);
             _cbFont.Items.AddRange(new object[] {
                 "Segoe UI Variable Text",
                 "Segoe UI",
-                "Segoe UI Semibold",
                 "Consolas",
-                "JetBrains Mono",
-                "Aptos",
                 "Calibri",
-                "Arial"
+                "Arial",
+                "Bahnschrift"
             });
             _cbFont.SelectedIndexChanged += (s, e) =>
             {
                 _workingConfig.FontFamily = _cbFont.SelectedItem.ToString();
                 _previewPanel.Invalidate();
             };
-            page.Controls.Add(_cbFont);
-            y += 38;
+            page.Controls.Add(new FluentSettingCard("Typeface (Font Family)", "Select typeface for telemetry numbers and units", _cbFont) { Location = new Point(0, y) });
+            y += 68;
 
-            AddLabel(page, "Font Size (pt):", 20, y);
-            _nudFontSize = new NumericUpDown { Left = 130, Top = y - 3, Width = 65, Minimum = 7, Maximum = 20, DecimalPlaces = 1 };
-            _nudFontSize.ValueChanged += (s, e) => { _workingConfig.FontSize = (float)_nudFontSize.Value; _previewPanel.Invalidate(); };
-            page.Controls.Add(_nudFontSize);
-
-            AddLabel(page, "Unit Size:", 205, y);
-            _nudUnitFontSize = new NumericUpDown { Left = 275, Top = y - 3, Width = 65, Minimum = 5, Maximum = 16, DecimalPlaces = 1 };
-            _nudUnitFontSize.ValueChanged += (s, e) => { _workingConfig.UnitFontSize = (float)_nudUnitFontSize.Value; _previewPanel.Invalidate(); };
-            page.Controls.Add(_nudUnitFontSize);
-
-            _chkFontBold = new CheckBox { Text = "Bold", Left = 360, Top = y - 3, AutoSize = true };
-            _chkFontBold.CheckedChanged += (s, e) => { _workingConfig.FontBold = _chkFontBold.Checked; _previewPanel.Invalidate(); };
-            page.Controls.Add(_chkFontBold);
-            y += 38;
-
-            _chkAutoTheme = new CheckBox { Text = "Auto-detect Windows Dark/Light taskbar theme colors", Left = 20, Top = y, AutoSize = true };
-            _chkAutoTheme.CheckedChanged += (s, e) =>
+            // Card 2: Font Size & Bold
+            var pnlFontProps = new Panel { Size = new Size(210, 32), BackColor = Color.Transparent };
+            _stepperFontSize = new FluentNumericStepper { Minimum = 6, Maximum = 24, Increment = 0.5m, DecimalPlaces = 1, Suffix = " pt", Size = new Size(116, 28) };
+            _stepperFontSize.ValueChanged += (s, e) =>
             {
-                _workingConfig.AutoTheme = _chkAutoTheme.Checked;
-                _btnUploadColor.Enabled = !_workingConfig.AutoTheme;
-                _btnDownloadColor.Enabled = !_workingConfig.AutoTheme;
-                _btnLabelColor.Enabled = !_workingConfig.AutoTheme;
+                _workingConfig.FontSize = (float)_stepperFontSize.Value;
                 _previewPanel.Invalidate();
             };
-            page.Controls.Add(_chkAutoTheme);
-            y += 36;
+            pnlFontProps.Controls.Add(_stepperFontSize);
 
-            AddLabel(page, "Upload Speed Color:", 20, y);
-            _btnUploadColor = new Button { Left = 150, Top = y - 5, Width = 100, Height = 28, FlatStyle = FlatStyle.Flat };
-            _btnUploadColor.Click += (s, e) => PickColor(c => _workingConfig.UploadColor = c, _workingConfig.UploadColor, _btnUploadColor);
-            page.Controls.Add(_btnUploadColor);
-            y += 38;
+            _toggleFontBold = new FluentToggleSwitch { Location = new Point(140, 3) };
+            _toggleFontBold.CheckedChanged += (s, e) =>
+            {
+                _workingConfig.FontBold = _toggleFontBold.Checked;
+                _previewPanel.Invalidate();
+            };
+            pnlFontProps.Controls.Add(_toggleFontBold);
 
-            AddLabel(page, "Download Speed Color:", 20, y);
-            _btnDownloadColor = new Button { Left = 150, Top = y - 5, Width = 100, Height = 28, FlatStyle = FlatStyle.Flat };
-            _btnDownloadColor.Click += (s, e) => PickColor(c => _workingConfig.DownloadColor = c, _workingConfig.DownloadColor, _btnDownloadColor);
-            page.Controls.Add(_btnDownloadColor);
-            y += 38;
+            var lblBold = new Label { Text = "Bold", Font = new Font("Segoe UI", 7.5f), ForeColor = Color.FromArgb(170, 170, 175), Location = new Point(184, 8), AutoSize = true };
+            pnlFontProps.Controls.Add(lblBold);
 
-            AddLabel(page, "Unit / Label Color:", 20, y);
-            _btnLabelColor = new Button { Left = 150, Top = y - 5, Width = 100, Height = 28, FlatStyle = FlatStyle.Flat };
-            _btnLabelColor.Click += (s, e) => PickColor(c => _workingConfig.LabelColor = c, _workingConfig.LabelColor, _btnLabelColor);
-            page.Controls.Add(_btnLabelColor);
-            y += 42;
+            page.Controls.Add(new FluentSettingCard("Digits Font Size & Weight", "Configure size (pt) and bold weight for speed numbers", pnlFontProps) { Location = new Point(0, y) });
+            y += 68;
 
-            _chkHoverHighlight = new CheckBox { Text = "Enable Windows 11 rounded hover highlight effect", Left = 20, Top = y, AutoSize = true };
-            _chkHoverHighlight.CheckedChanged += (s, e) => { _workingConfig.ShowHoverHighlight = _chkHoverHighlight.Checked; _previewPanel.Invalidate(); };
-            page.Controls.Add(_chkHoverHighlight);
-            y += 40;
+            // Card 3: Unit Size
+            _stepperUnitFontSize = new FluentNumericStepper { Minimum = 5, Maximum = 20, Increment = 0.5m, DecimalPlaces = 1, Suffix = " pt" };
+            _stepperUnitFontSize.ValueChanged += (s, e) =>
+            {
+                _workingConfig.UnitFontSize = (float)_stepperUnitFontSize.Value;
+                _previewPanel.Invalidate();
+            };
+            page.Controls.Add(new FluentSettingCard("Unit Label Font Size", "Independent font size for KB/s, MB/s unit suffixes", _stepperUnitFontSize) { Location = new Point(0, y) });
+            y += 68;
 
-            // Color Presets
-            AddLabel(page, "Color Presets:", 20, y);
-            var btnPresetWin = new Button { Text = "Native Win11", Left = 120, Top = y - 5, Width = 95, Height = 26, FlatStyle = FlatStyle.Flat };
-            btnPresetWin.Click += (s, e) => SetPreset("#E4E4E4", "#E4E4E4", "#A0A0A0");
-            page.Controls.Add(btnPresetWin);
+            // Card 4: Auto Theme
+            _toggleAutoTheme = new FluentToggleSwitch();
+            _toggleAutoTheme.CheckedChanged += (s, e) =>
+            {
+                _workingConfig.AutoTheme = _toggleAutoTheme.Checked;
+                UpdateColorChipStates();
+                _previewPanel.Invalidate();
+            };
+            page.Controls.Add(new FluentSettingCard("Windows Auto-Theme Detection", "Automatically harmonize colors with Dark or Light taskbar", _toggleAutoTheme) { Location = new Point(0, y) });
+            y += 68;
 
-            var btnPresetCyan = new Button { Text = "Cyan & Green", Left = 225, Top = y - 5, Width = 95, Height = 26, FlatStyle = FlatStyle.Flat };
-            btnPresetCyan.Click += (s, e) => SetPreset("#4CC2FF", "#6CCB5F", "#D0D0D0");
-            page.Controls.Add(btnPresetCyan);
+            // Card 5: Speed Accent Colors
+            var pnlColorChips = new Panel { Size = new Size(210, 34), BackColor = Color.Transparent };
+            _chipUploadColor = CreateColorChip(0, "Upload", hex => _workingConfig.UploadColor = hex);
+            _chipDownloadColor = CreateColorChip(70, "Download", hex => _workingConfig.DownloadColor = hex);
+            _chipLabelColor = CreateColorChip(140, "Units", hex => _workingConfig.LabelColor = hex);
 
-            var btnPresetAmber = new Button { Text = "Amber & Blue", Left = 330, Top = y - 5, Width = 95, Height = 26, FlatStyle = FlatStyle.Flat };
-            btnPresetAmber.Click += (s, e) => SetPreset("#FFA066", "#60CDFF", "#D8D8D8");
-            page.Controls.Add(btnPresetAmber);
+            pnlColorChips.Controls.Add(_chipUploadColor);
+            pnlColorChips.Controls.Add(_chipDownloadColor);
+            pnlColorChips.Controls.Add(_chipLabelColor);
+
+            page.Controls.Add(new FluentSettingCard("Speed Accent Colors", "Upload (▲), Download (▼), and Unit Label colors", pnlColorChips) { Location = new Point(0, y) });
+            y += 68;
+
+            // Card 6: Color Presets
+            var pnlPresets = new Panel { Size = new Size(240, 32), BackColor = Color.Transparent };
+            Button btnFluent = CreatePresetButton("Default", 0, "#4CC2FF", "#6CCB5F", "#D0D0D0");
+            Button btnBlue = CreatePresetButton("Windows", 60, "#60CDFF", "#0078D4", "#CCCCCC");
+            Button btnAmber = CreatePresetButton("Amber", 120, "#FFA726", "#FB8C00", "#F5F5F5");
+            Button btnMono = CreatePresetButton("Mono", 180, "#FFFFFF", "#CCCCCC", "#999999");
+            pnlPresets.Controls.Add(btnFluent);
+            pnlPresets.Controls.Add(btnBlue);
+            pnlPresets.Controls.Add(btnAmber);
+            pnlPresets.Controls.Add(btnMono);
+
+            page.Controls.Add(new FluentSettingCard("Color Palette Presets", "One-click harmonious Fluent palettes", pnlPresets) { Location = new Point(0, y) });
+            y += 68;
+
+            // Card 7: Hover Highlight Pill
+            _toggleHoverHighlight = new FluentToggleSwitch();
+            _toggleHoverHighlight.CheckedChanged += (s, e) =>
+            {
+                _workingConfig.ShowHoverHighlight = _toggleHoverHighlight.Checked;
+            };
+            page.Controls.Add(new FluentSettingCard("Taskbar Hover Highlight Pill", "Display subtle Windows 11 rounded background pill on cursor hover", _toggleHoverHighlight) { Location = new Point(0, y) });
+            y += 68;
         }
 
-        private void SetPreset(string up, string dn, string lbl)
+        private void BuildSpacingCards(Panel page)
         {
-            _workingConfig.UploadColor = up;
-            _workingConfig.DownloadColor = dn;
-            _workingConfig.LabelColor = lbl;
-            UpdateColorButtons();
-            _previewPanel.Invalidate();
-        }
+            int y = 6;
 
-        private void BuildGeometryTab(TabPage page)
-        {
-            int y = 20;
-
-            AddLabel(page, "Arrow Glyphs:", 20, y);
-            _cbArrowStyle = new ComboBox { Left = 160, Top = y - 3, Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
-            _cbArrowStyle.Items.AddRange(new object[] { "Triangles (▲ / ▼)", "Arrows (↑ / ↓)", "Letters (U: / D:)", "None" });
+            // Card 1: Arrow Glyphs
+            _cbArrowStyle = CreateStyledComboBox(210);
+            _cbArrowStyle.Items.AddRange(new object[] {
+                "Triangles (▲ / ▼)",
+                "Arrows (↑ / ↓)",
+                "Letters (U: / D:)",
+                "None (Clean Digits)"
+            });
             _cbArrowStyle.SelectedIndexChanged += (s, e) =>
             {
                 _workingConfig.ArrowStyle = (ArrowStyle)_cbArrowStyle.SelectedIndex;
                 _previewPanel.Invalidate();
             };
-            page.Controls.Add(_cbArrowStyle);
-            y += 38;
+            page.Controls.Add(new FluentSettingCard("Direction Glyphs", "Choose indicator prefix symbol style", _cbArrowStyle) { Location = new Point(0, y) });
+            y += 68;
 
-            AddLabel(page, "Unit Format:", 20, y);
-            _cbUnitMode = new ComboBox { Left = 160, Top = y - 3, Width = 200, DropDownStyle = ComboBoxStyle.DropDownList };
+            // Card 2: Unit Mode
+            _cbUnitMode = CreateStyledComboBox(210);
             _cbUnitMode.Items.AddRange(new object[] {
-                "Auto Bytes (B/s, KB/s, MB/s, GB/s)",
-                "Auto Bits (bps, Kbps, Mbps, Gbps)",
-                "Always KB/s",
-                "Always MB/s"
+                "Auto Bytes (B/s, KB/s, MB/s)",
+                "Auto Bits (bps, Kbps, Mbps)",
+                "Fixed KB/s",
+                "Fixed MB/s"
             });
             _cbUnitMode.SelectedIndexChanged += (s, e) =>
             {
                 _workingConfig.UnitMode = (UnitMode)_cbUnitMode.SelectedIndex;
                 _previewPanel.Invalidate();
             };
-            page.Controls.Add(_cbUnitMode);
-            y += 38;
+            page.Controls.Add(new FluentSettingCard("Bandwidth Unit Mode", "Format data rates in bytes or bits", _cbUnitMode) { Location = new Point(0, y) });
+            y += 68;
 
-            AddLabel(page, "Decimal Places:", 20, y);
-            _nudDecimals = new NumericUpDown { Left = 160, Top = y - 3, Width = 90, Minimum = 0, Maximum = 3 };
-            _nudDecimals.ValueChanged += (s, e) => { _workingConfig.DecimalPlaces = (int)_nudDecimals.Value; _previewPanel.Invalidate(); };
-            page.Controls.Add(_nudDecimals);
-            y += 38;
-
-            AddLabel(page, "Horizontal Padding (px):", 20, y);
-            _nudPaddingX = new NumericUpDown { Left = 160, Top = y - 3, Width = 90, Minimum = 0, Maximum = 40 };
-            _nudPaddingX.ValueChanged += (s, e) => { _workingConfig.PaddingX = (int)_nudPaddingX.Value; _previewPanel.Invalidate(); };
-            page.Controls.Add(_nudPaddingX);
-            y += 38;
-
-            AddLabel(page, "Vertical Padding (px):", 20, y);
-            _nudPaddingY = new NumericUpDown { Left = 160, Top = y - 3, Width = 90, Minimum = 0, Maximum = 15 };
-            _nudPaddingY.ValueChanged += (s, e) => { _workingConfig.PaddingY = (int)_nudPaddingY.Value; _previewPanel.Invalidate(); };
-            page.Controls.Add(_nudPaddingY);
-            y += 38;
-
-            AddLabel(page, "Item Spacing (px):", 20, y);
-            _nudSpacing = new NumericUpDown { Left = 160, Top = y - 3, Width = 90, Minimum = 0, Maximum = 30 };
-            _nudSpacing.ValueChanged += (s, e) => { _workingConfig.ItemSpacing = (int)_nudSpacing.Value; _previewPanel.Invalidate(); };
-            page.Controls.Add(_nudSpacing);
-            y += 38;
-
-            AddLabel(page, "Overall Opacity (%):", 20, y);
-            _nudOverallOpacity = new NumericUpDown { Left = 160, Top = y - 3, Width = 90, Minimum = 30, Maximum = 100 };
-            _nudOverallOpacity.ValueChanged += (s, e) => { _workingConfig.OverallOpacityPercent = (int)_nudOverallOpacity.Value; _previewPanel.Invalidate(); };
-            page.Controls.Add(_nudOverallOpacity);
-            y += 36;
-
-            _chkIdleDimming = new CheckBox { Text = "Dim display when network is idle (< 1 KB/s)", Left = 20, Top = y, AutoSize = true };
-            _chkIdleDimming.CheckedChanged += (s, e) =>
+            // Card 3: Decimal Places
+            _stepperDecimals = new FluentNumericStepper { Minimum = 0, Maximum = 3, Increment = 1, Suffix = " digits" };
+            _stepperDecimals.ValueChanged += (s, e) =>
             {
-                _workingConfig.IdleDimming = _chkIdleDimming.Checked;
-                _nudIdleOpacity.Enabled = _chkIdleDimming.Checked;
+                _workingConfig.DecimalPlaces = (int)_stepperDecimals.Value;
                 _previewPanel.Invalidate();
             };
-            page.Controls.Add(_chkIdleDimming);
-            y += 30;
+            page.Controls.Add(new FluentSettingCard("Decimal Precision", "Number of fractional decimal places to display", _stepperDecimals) { Location = new Point(0, y) });
+            y += 68;
 
-            AddLabel(page, "Idle Dim Opacity (%):", 40, y);
-            _nudIdleOpacity = new NumericUpDown { Left = 175, Top = y - 3, Width = 75, Minimum = 15, Maximum = 90 };
-            _nudIdleOpacity.ValueChanged += (s, e) => { _workingConfig.IdleOpacityPercent = (int)_nudIdleOpacity.Value; _previewPanel.Invalidate(); };
-            page.Controls.Add(_nudIdleOpacity);
+            // Card 4: Horizontal & Vertical Padding
+            var pnlPaddings = new Panel { Size = new Size(210, 32), BackColor = Color.Transparent };
+            _stepperPaddingX = new FluentNumericStepper { Minimum = 0, Maximum = 40, Increment = 1, Suffix = " X", Size = new Size(100, 28) };
+            _stepperPaddingX.ValueChanged += (s, e) =>
+            {
+                _workingConfig.PaddingX = (int)_stepperPaddingX.Value;
+                _previewPanel.Invalidate();
+            };
+            pnlPaddings.Controls.Add(_stepperPaddingX);
+
+            _stepperPaddingY = new FluentNumericStepper { Minimum = 0, Maximum = 20, Increment = 1, Suffix = " Y", Size = new Size(100, 28), Location = new Point(106, 0) };
+            _stepperPaddingY.ValueChanged += (s, e) =>
+            {
+                _workingConfig.PaddingY = (int)_stepperPaddingY.Value;
+                _previewPanel.Invalidate();
+            };
+            pnlPaddings.Controls.Add(_stepperPaddingY);
+
+            page.Controls.Add(new FluentSettingCard("Internal Margin Padding", "Horizontal (X) and vertical (Y) padding around text", pnlPaddings) { Location = new Point(0, y) });
+            y += 68;
+
+            // Card 5: Item Spacing
+            _stepperSpacing = new FluentNumericStepper { Minimum = 0, Maximum = 30, Increment = 1, Suffix = " px" };
+            _stepperSpacing.ValueChanged += (s, e) =>
+            {
+                _workingConfig.ItemSpacing = (int)_stepperSpacing.Value;
+                _previewPanel.Invalidate();
+            };
+            page.Controls.Add(new FluentSettingCard("Glyph & Item Spacing", "Space between speed readouts and glyph arrows", _stepperSpacing) { Location = new Point(0, y) });
+            y += 68;
+
+            // Card 6: Overall Opacity
+            _stepperOverallOpacity = new FluentNumericStepper { Minimum = 30, Maximum = 100, Increment = 5, Suffix = "%" };
+            _stepperOverallOpacity.ValueChanged += (s, e) =>
+            {
+                _workingConfig.OverallOpacityPercent = (int)_stepperOverallOpacity.Value;
+                _previewPanel.Invalidate();
+            };
+            page.Controls.Add(new FluentSettingCard("Overall Meter Opacity", "Configure transparency percentage (30% to 100%)", _stepperOverallOpacity) { Location = new Point(0, y) });
+            y += 68;
+
+            // Card 7: Idle Traffic Dimming
+            var pnlIdle = new Panel { Size = new Size(210, 32), BackColor = Color.Transparent };
+            _stepperIdleOpacity = new FluentNumericStepper { Minimum = 10, Maximum = 90, Increment = 5, Suffix = "%", Size = new Size(116, 28) };
+            _stepperIdleOpacity.ValueChanged += (s, e) =>
+            {
+                _workingConfig.IdleOpacityPercent = (int)_stepperIdleOpacity.Value;
+            };
+            pnlIdle.Controls.Add(_stepperIdleOpacity);
+
+            _toggleIdleDimming = new FluentToggleSwitch { Location = new Point(140, 3) };
+            _toggleIdleDimming.CheckedChanged += (s, e) =>
+            {
+                _workingConfig.IdleDimming = _toggleIdleDimming.Checked;
+                _stepperIdleOpacity.Enabled = _toggleIdleDimming.Checked;
+            };
+            pnlIdle.Controls.Add(_toggleIdleDimming);
+
+            page.Controls.Add(new FluentSettingCard("Idle Bandwidth Dimming", "Dim meter font opacity when traffic drops below 1 KB/s", pnlIdle) { Location = new Point(0, y) });
+            y += 68;
         }
 
-        private void BuildSystemTab(TabPage page)
+        private void BuildSystemCards(Panel page)
         {
-            int y = 20;
+            int y = 6;
 
-            AddLabel(page, "Network Adapter:", 20, y);
-            _cbAdapter = new ComboBox { Left = 160, Top = y - 3, Width = 280, DropDownStyle = ComboBoxStyle.DropDownList };
+            // Card 1: Network Adapter
+            _cbAdapter = CreateStyledComboBox(220);
             _cbAdapter.Items.Add("All Active Adapters (Aggregated)");
-
-            var adapters = _networkMonitor.GetAvailableAdapters();
-            foreach (var a in adapters)
+            try
             {
-                _cbAdapter.Items.Add(a.Alias);
+                var adapters = _networkMonitor.GetAvailableAdapters();
+                foreach (var a in adapters)
+                {
+                    _cbAdapter.Items.Add(a.Alias);
+                }
             }
-            _cbAdapter.SelectedIndex = 0;
+            catch { }
             _cbAdapter.SelectedIndexChanged += (s, e) =>
             {
-                if (_cbAdapter.SelectedIndex <= 0)
-                {
-                    _workingConfig.SelectedAdapterAlias = "";
-                }
-                else
-                {
-                    _workingConfig.SelectedAdapterAlias = _cbAdapter.SelectedItem.ToString();
-                }
+                if (_cbAdapter.SelectedIndex == 0) _workingConfig.SelectedAdapterAlias = "";
+                else _workingConfig.SelectedAdapterAlias = _cbAdapter.SelectedItem.ToString();
             };
-            page.Controls.Add(_cbAdapter);
-            y += 45;
+            page.Controls.Add(new FluentSettingCard("Target Network Interface", "Aggregate all adapters or monitor a single NIC", _cbAdapter) { Location = new Point(0, y) });
+            y += 68;
 
-            AddLabel(page, "Refresh Interval:", 20, y);
-            _cbRefreshInterval = new ComboBox { Left = 160, Top = y - 3, Width = 180, DropDownStyle = ComboBoxStyle.DropDownList };
-            _cbRefreshInterval.Items.AddRange(new object[] { "500 ms (Fast)", "1000 ms (1 sec - Recommended)", "1500 ms", "2000 ms (2 sec)", "3000 ms" });
+            // Card 2: Sampling Refresh Rate
+            _cbRefreshInterval = CreateStyledComboBox(220);
+            _cbRefreshInterval.Items.AddRange(new object[] {
+                "500 ms (Fast)",
+                "1000 ms (Recommended)",
+                "1500 ms (Balanced)",
+                "2000 ms (Energy Saving)",
+                "3000 ms (Minimal Poll)"
+            });
             _cbRefreshInterval.SelectedIndexChanged += (s, e) =>
             {
-                switch (_cbRefreshInterval.SelectedIndex)
-                {
-                    case 0: _workingConfig.UpdateIntervalMs = 500; break;
-                    case 1: _workingConfig.UpdateIntervalMs = 1000; break;
-                    case 2: _workingConfig.UpdateIntervalMs = 1500; break;
-                    case 3: _workingConfig.UpdateIntervalMs = 2000; break;
-                    case 4: _workingConfig.UpdateIntervalMs = 3000; break;
-                }
+                int[] intervals = new int[] { 500, 1000, 1500, 2000, 3000 };
+                int idx = _cbRefreshInterval.SelectedIndex;
+                if (idx >= 0 && idx < intervals.Length) _workingConfig.UpdateIntervalMs = intervals[idx];
             };
-            page.Controls.Add(_cbRefreshInterval);
-            y += 45;
+            page.Controls.Add(new FluentSettingCard("Telemetry Polling Rate", "Frequency of network kernel table sampling", _cbRefreshInterval) { Location = new Point(0, y) });
+            y += 68;
 
-            AddLabel(page, "Left-Click Action:", 20, y);
-            _cbLeftClickAction = new ComboBox { Left = 160, Top = y - 3, Width = 260, DropDownStyle = ComboBoxStyle.DropDownList };
+            // Card 3: Left-Click Action
+            _cbLeftClickAction = CreateStyledComboBox(220);
             _cbLeftClickAction.Items.AddRange(new object[] {
-                "Open Live Flyout Popup (Recommended)",
+                "Open Taskbar Flyout Popup",
                 "Open Windows Task Manager",
-                "Do Nothing"
+                "None (Do Nothing)"
             });
             _cbLeftClickAction.SelectedIndexChanged += (s, e) =>
             {
-                if (_cbLeftClickAction.SelectedIndex == 0) _workingConfig.LeftClickAction = LeftClickAction.Flyout;
-                else if (_cbLeftClickAction.SelectedIndex == 1) _workingConfig.LeftClickAction = LeftClickAction.TaskManager;
-                else _workingConfig.LeftClickAction = LeftClickAction.None;
+                LeftClickAction[] actions = new LeftClickAction[] {
+                    LeftClickAction.Flyout,
+                    LeftClickAction.TaskManager,
+                    LeftClickAction.None
+                };
+                int idx = _cbLeftClickAction.SelectedIndex;
+                if (idx >= 0 && idx < actions.Length) _workingConfig.LeftClickAction = actions[idx];
             };
-            page.Controls.Add(_cbLeftClickAction);
-            y += 45;
+            page.Controls.Add(new FluentSettingCard("Taskbar Left-Click Action", "Action triggered when clicking the meter on your taskbar", _cbLeftClickAction) { Location = new Point(0, y) });
+            y += 68;
 
-            _chkStartWithWindows = new CheckBox { Text = "Start automatically when Windows boots", Left = 20, Top = y, AutoSize = true };
-            _chkStartWithWindows.CheckedChanged += (s, e) => { _workingConfig.StartWithWindows = _chkStartWithWindows.Checked; };
-            page.Controls.Add(_chkStartWithWindows);
+            // Card 4: Start with Windows
+            _toggleStartWithWindows = new FluentToggleSwitch();
+            _toggleStartWithWindows.CheckedChanged += (s, e) =>
+            {
+                _workingConfig.StartWithWindows = _toggleStartWithWindows.Checked;
+            };
+            page.Controls.Add(new FluentSettingCard("Start with Windows", "Automatically launch metriX when you log in", _toggleStartWithWindows) { Location = new Point(0, y) });
+            y += 68;
         }
 
-        private static void AddLabel(Control parent, string text, int x, int y)
+        private ComboBox CreateStyledComboBox(int width)
         {
-            var lbl = new Label { Text = text, Left = x, Top = y, AutoSize = true, ForeColor = Color.FromArgb(220, 220, 220) };
-            parent.Controls.Add(lbl);
+            var cb = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Width = width,
+                Height = 30,
+                BackColor = Color.FromArgb(36, 36, 40),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
+                DrawMode = DrawMode.OwnerDrawFixed,
+                ItemHeight = 24
+            };
+
+            cb.DrawItem += (s, e) =>
+            {
+                if (e.Index < 0) return;
+                bool selected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
+                Color bg = selected ? Color.FromArgb(0, 120, 215) : Color.FromArgb(36, 36, 40);
+                using (var brush = new SolidBrush(bg))
+                {
+                    e.Graphics.FillRectangle(brush, e.Bounds);
+                }
+                string itemText = cb.Items[e.Index].ToString();
+                using (var textBrush = new SolidBrush(Color.White))
+                {
+                    e.Graphics.DrawString(itemText, cb.Font, textBrush, e.Bounds.X + 6, e.Bounds.Y + 3);
+                }
+            };
+
+            return cb;
+        }
+
+        private Panel CreateColorChip(int x, string label, Action<string> onColorPicked)
+        {
+            var pnl = new Panel
+            {
+                Location = new Point(x, 2),
+                Size = new Size(62, 28),
+                BackColor = Color.FromArgb(76, 194, 255),
+                Cursor = Cursors.Hand
+            };
+
+            pnl.Paint += (s, e) =>
+            {
+                Graphics g = e.Graphics;
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
+
+                int w = pnl.Width - 1;
+                int h = pnl.Height - 1;
+
+                using (var path = GetRoundedRect(0, 0, w, h, 4))
+                {
+                    using (var fillBrush = new SolidBrush(pnl.BackColor))
+                    {
+                        g.FillPath(fillBrush, path);
+                    }
+                    using (var pen = new Pen(Color.FromArgb(80, 255, 255, 255), 1))
+                    {
+                        g.DrawPath(pen, path);
+                    }
+                }
+
+                // Dynamic contrast text
+                double lum = (pnl.BackColor.R * 0.299 + pnl.BackColor.G * 0.587 + pnl.BackColor.B * 0.114);
+                Color textCol = lum > 140 ? Color.FromArgb(20, 20, 20) : Color.White;
+
+                using (var font = new Font("Segoe UI", 7.5f, FontStyle.Bold))
+                using (var brush = new SolidBrush(textCol))
+                {
+                    SizeF sz = g.MeasureString(label, font);
+                    g.DrawString(label, font, brush, (pnl.Width - sz.Width) / 2, (pnl.Height - sz.Height) / 2);
+                }
+            };
+
+            pnl.Click += (s, e) =>
+            {
+                if (_workingConfig.AutoTheme) return;
+                using (var cd = new ColorDialog())
+                {
+                    cd.Color = pnl.BackColor;
+                    if (cd.ShowDialog() == DialogResult.OK)
+                    {
+                        string hex = "#" + cd.Color.R.ToString("X2") + cd.Color.G.ToString("X2") + cd.Color.B.ToString("X2");
+                        onColorPicked(hex);
+                        pnl.BackColor = cd.Color;
+                        pnl.Invalidate();
+                        _previewPanel.Invalidate();
+                    }
+                }
+            };
+
+            return pnl;
+        }
+
+        private static GraphicsPath GetRoundedRect(int x, int y, int width, int height, int radius)
+        {
+            GraphicsPath path = new GraphicsPath();
+            int diameter = radius * 2;
+            Rectangle arc = new Rectangle(x, y, diameter, diameter);
+
+            path.AddArc(arc, 180, 90);
+            arc.X = x + width - diameter;
+            path.AddArc(arc, 270, 90);
+            arc.Y = y + height - diameter;
+            path.AddArc(arc, 0, 90);
+            arc.X = x;
+            path.AddArc(arc, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
+
+        private Button CreatePresetButton(string text, int x, string uHex, string dHex, string lHex)
+        {
+            var btn = new Button
+            {
+                Text = text,
+                Font = new Font("Segoe UI", 7.5f, FontStyle.Regular),
+                ForeColor = Color.FromArgb(220, 220, 220),
+                BackColor = Color.FromArgb(42, 42, 46),
+                FlatStyle = FlatStyle.Flat,
+                Size = new Size(56, 26),
+                Location = new Point(x, 3),
+                Cursor = Cursors.Hand
+            };
+            btn.FlatAppearance.BorderColor = Color.FromArgb(60, 60, 65);
+            btn.Click += (s, e) =>
+            {
+                _workingConfig.AutoTheme = false;
+                _toggleAutoTheme.Checked = false;
+                _workingConfig.UploadColor = uHex;
+                _workingConfig.DownloadColor = dHex;
+                _workingConfig.LabelColor = lHex;
+                _chipUploadColor.BackColor = ColorTranslator.FromHtml(uHex);
+                _chipDownloadColor.BackColor = ColorTranslator.FromHtml(dHex);
+                _chipLabelColor.BackColor = ColorTranslator.FromHtml(lHex);
+                _chipUploadColor.Invalidate();
+                _chipDownloadColor.Invalidate();
+                _chipLabelColor.Invalidate();
+                UpdateColorChipStates();
+                _previewPanel.Invalidate();
+            };
+            return btn;
+        }
+
+        private void UpdateColorChipStates()
+        {
+            bool custom = !_workingConfig.AutoTheme;
+            _chipUploadColor.Enabled = custom;
+            _chipDownloadColor.Enabled = custom;
+            _chipLabelColor.Enabled = custom;
+        }
+
+        private void BuildBottomActionBar()
+        {
+            var pnlBar = new Panel
+            {
+                Location = new Point(0, 565),
+                Size = new Size(Width, 50),
+                BackColor = Color.FromArgb(24, 24, 26)
+            };
+
+            pnlBar.Paint += (s, e) =>
+            {
+                using (var pen = new Pen(Color.FromArgb(42, 42, 46), 1))
+                {
+                    e.Graphics.DrawLine(pen, 0, 0, pnlBar.Width, 0);
+                }
+            };
+
+            var btnReset = new Button
+            {
+                Text = "Reset to Defaults",
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
+                ForeColor = Color.FromArgb(170, 170, 175),
+                BackColor = Color.Transparent,
+                FlatStyle = FlatStyle.Flat,
+                Size = new Size(130, 32),
+                Location = new Point(14, 9),
+                Cursor = Cursors.Hand
+            };
+            btnReset.FlatAppearance.BorderSize = 0;
+            btnReset.Click += (s, e) =>
+            {
+                if (MessageBox.Show("Reset all settings to Windows 11 defaults?", "metriX", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                {
+                    _workingConfig = new AppConfig();
+                    PopulateValues();
+                    _previewPanel.Invalidate();
+                }
+            };
+
+            var btnSave = new Button
+            {
+                Text = "Save Changes",
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(0, 120, 215),
+                FlatStyle = FlatStyle.Flat,
+                Size = new Size(125, 32),
+                Location = new Point(Width - 280, 9),
+                Cursor = Cursors.Hand
+            };
+            btnSave.FlatAppearance.BorderSize = 0;
+            btnSave.Click += (s, e) => ApplyAndClose();
+
+            var btnCancel = new Button
+            {
+                Text = "Cancel",
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
+                ForeColor = Color.FromArgb(220, 220, 220),
+                BackColor = Color.FromArgb(42, 42, 46),
+                FlatStyle = FlatStyle.Flat,
+                Size = new Size(95, 32),
+                Location = new Point(Width - 145, 9),
+                Cursor = Cursors.Hand
+            };
+            btnCancel.FlatAppearance.BorderColor = Color.FromArgb(60, 60, 65);
+            btnCancel.Click += (s, e) => Close();
+
+            pnlBar.Controls.Add(btnReset);
+            pnlBar.Controls.Add(btnSave);
+            pnlBar.Controls.Add(btnCancel);
+            Controls.Add(pnlBar);
         }
 
         private void PopulateValues()
         {
             _cbPosition.SelectedIndex = (int)_workingConfig.Position;
-            _nudOffsetX.Value = _workingConfig.OffsetX;
-            _nudOffsetY.Value = _workingConfig.OffsetY;
             _cbLayout.SelectedIndex = (int)_workingConfig.Layout;
-            _chkAllMonitors.Checked = _workingConfig.ShowOnAllMonitors;
+            _stepperOffsetX.Value = _workingConfig.OffsetX;
+            _stepperOffsetY.Value = _workingConfig.OffsetY;
+            _toggleAllMonitors.Checked = _workingConfig.ShowOnAllMonitors;
 
             int fIdx = _cbFont.FindStringExact(_workingConfig.FontFamily);
             _cbFont.SelectedIndex = fIdx >= 0 ? fIdx : 0;
-            _nudFontSize.Value = (decimal)_workingConfig.FontSize;
-            _nudUnitFontSize.Value = (decimal)_workingConfig.UnitFontSize;
-            _chkFontBold.Checked = _workingConfig.FontBold;
+            _stepperFontSize.Value = (decimal)_workingConfig.FontSize;
+            _stepperUnitFontSize.Value = (decimal)_workingConfig.UnitFontSize;
+            _toggleFontBold.Checked = _workingConfig.FontBold;
+            _toggleAutoTheme.Checked = _workingConfig.AutoTheme;
 
-            _chkAutoTheme.Checked = _workingConfig.AutoTheme;
-            _btnUploadColor.Enabled = !_workingConfig.AutoTheme;
-            _btnDownloadColor.Enabled = !_workingConfig.AutoTheme;
-            _btnLabelColor.Enabled = !_workingConfig.AutoTheme;
+            _chipUploadColor.BackColor = ColorTranslator.FromHtml(_workingConfig.UploadColor);
+            _chipDownloadColor.BackColor = ColorTranslator.FromHtml(_workingConfig.DownloadColor);
+            _chipLabelColor.BackColor = ColorTranslator.FromHtml(_workingConfig.LabelColor);
+            UpdateColorChipStates();
 
-            UpdateColorButtons();
-            _chkHoverHighlight.Checked = _workingConfig.ShowHoverHighlight;
-
-            _nudOverallOpacity.Value = _workingConfig.OverallOpacityPercent;
-            _chkIdleDimming.Checked = _workingConfig.IdleDimming;
-            _nudIdleOpacity.Value = _workingConfig.IdleOpacityPercent;
-            _nudIdleOpacity.Enabled = _workingConfig.IdleDimming;
+            _toggleHoverHighlight.Checked = _workingConfig.ShowHoverHighlight;
 
             _cbArrowStyle.SelectedIndex = (int)_workingConfig.ArrowStyle;
             _cbUnitMode.SelectedIndex = (int)_workingConfig.UnitMode;
-            _nudDecimals.Value = _workingConfig.DecimalPlaces;
-            _nudPaddingX.Value = _workingConfig.PaddingX;
-            _nudPaddingY.Value = _workingConfig.PaddingY;
-            _nudSpacing.Value = _workingConfig.ItemSpacing;
+            _stepperDecimals.Value = _workingConfig.DecimalPlaces;
+            _stepperPaddingX.Value = _workingConfig.PaddingX;
+            _stepperPaddingY.Value = _workingConfig.PaddingY;
+            _stepperSpacing.Value = _workingConfig.ItemSpacing;
+            _stepperOverallOpacity.Value = _workingConfig.OverallOpacityPercent;
+
+            _toggleIdleDimming.Checked = _workingConfig.IdleDimming;
+            _stepperIdleOpacity.Value = _workingConfig.IdleOpacityPercent;
+            _stepperIdleOpacity.Enabled = _workingConfig.IdleDimming;
 
             if (!string.IsNullOrEmpty(_workingConfig.SelectedAdapterAlias))
             {
@@ -574,39 +991,17 @@ namespace MetriX.UI
             if (_workingConfig.LeftClickAction == LeftClickAction.Flyout) _cbLeftClickAction.SelectedIndex = 0;
             else if (_workingConfig.LeftClickAction == LeftClickAction.TaskManager) _cbLeftClickAction.SelectedIndex = 1;
             else _cbLeftClickAction.SelectedIndex = 2;
-            _chkStartWithWindows.Checked = _workingConfig.StartWithWindows;
-        }
 
-        private void UpdateColorButtons()
-        {
-            _btnUploadColor.BackColor = ColorTranslator.FromHtml(_workingConfig.UploadColor);
-            _btnDownloadColor.BackColor = ColorTranslator.FromHtml(_workingConfig.DownloadColor);
-            _btnLabelColor.BackColor = ColorTranslator.FromHtml(_workingConfig.LabelColor);
-        }
-
-        private void PickColor(Action<string> setter, string currentColorHex, Button btn)
-        {
-            using (var cd = new ColorDialog())
-            {
-                cd.Color = ColorTranslator.FromHtml(currentColorHex);
-                if (cd.ShowDialog() == DialogResult.OK)
-                {
-                    string colorHex = "#" + cd.Color.R.ToString("X2") + cd.Color.G.ToString("X2") + cd.Color.B.ToString("X2");
-                    setter(colorHex);
-                    btn.BackColor = cd.Color;
-                    _previewPanel.Invalidate();
-                }
-            }
+            _toggleStartWithWindows.Checked = _workingConfig.StartWithWindows;
         }
 
         private void OnPreviewPaint(object sender, PaintEventArgs e)
         {
             Graphics g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+            g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
 
-            // Draw simulated taskbar background
-            g.Clear(Color.FromArgb(28, 28, 28));
+            g.Clear(Color.FromArgb(20, 20, 22));
 
             string fontName = string.IsNullOrEmpty(_workingConfig.FontFamily) ? "Segoe UI Variable Text" : _workingConfig.FontFamily;
             FontStyle style = _workingConfig.FontBold ? FontStyle.Bold : FontStyle.Regular;
@@ -649,8 +1044,8 @@ namespace MetriX.UI
 
                 if (_workingConfig.Layout == LayoutMode.Stacked)
                 {
-                    int y1 = 4;
-                    int y2 = 22;
+                    int y1 = 3;
+                    int y2 = 21;
 
                     float x1 = startX;
                     if (!string.IsNullOrEmpty(upArrow))
@@ -685,7 +1080,7 @@ namespace MetriX.UI
                     g.DrawString(sampleUpVal, font, upBrush, x, y);
                     x += g.MeasureString(sampleUpVal, font).Width + 2;
                     g.DrawString(sampleUnit, unitFont, lblBrush, x, y + baselineOffset);
-                    x += g.MeasureString(sampleUnit, unitFont).Width + _workingConfig.ItemSpacing + 10;
+                    x += g.MeasureString(sampleUnit, unitFont).Width + _workingConfig.ItemSpacing + 12;
 
                     if (!string.IsNullOrEmpty(dnArrow))
                     {
