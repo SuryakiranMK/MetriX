@@ -32,7 +32,7 @@ namespace MetriX.UI
         {
             _notifyIcon = new NotifyIcon
             {
-                Icon = GenerateTrayIcon(),
+                Icon = GetAppIcon(),
                 Text = "metriX - Taskbar Speed Indicator",
                 Visible = true
             };
@@ -51,6 +51,28 @@ namespace MetriX.UI
 
             _notifyIcon.ContextMenuStrip = menu;
             _notifyIcon.DoubleClick += (s, e) => ShowSettings();
+        }
+
+        private Icon GetAppIcon()
+        {
+            try
+            {
+                string exePath = Application.ExecutablePath;
+                Icon assocIcon = Icon.ExtractAssociatedIcon(exePath);
+                if (assocIcon != null) return assocIcon;
+            }
+            catch { }
+
+            try
+            {
+                if (System.IO.File.Exists("app.ico"))
+                {
+                    return new Icon("app.ico");
+                }
+            }
+            catch { }
+
+            return GenerateTrayIcon();
         }
 
         private Icon GenerateTrayIcon()

@@ -98,6 +98,13 @@ namespace MetriX.UI
             ForeColor = Color.FromArgb(240, 240, 240);
             Font = new Font("Segoe UI", 9.0f, FontStyle.Regular);
 
+            try
+            {
+                if (System.IO.File.Exists("app.ico")) Icon = new Icon("app.ico");
+                else Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            }
+            catch { }
+
             // Live Preview Card
             var previewGroup = new GroupBox
             {

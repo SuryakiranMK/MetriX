@@ -12,9 +12,9 @@ namespace MetriX.Services
         private IntPtr _hTrayNotify;
         private IntPtr _hTaskList;
 
-        private NativeMethods.RECT _lastTaskbarRect;
-        private NativeMethods.RECT _lastTrayRect;
-        private NativeMethods.RECT _lastTaskListRect;
+        private NativeMethods.RECT _lastValidTaskbarRect;
+        private NativeMethods.RECT _lastValidTrayRect;
+        private NativeMethods.RECT _lastValidTaskListRect;
 
         public bool IsTaskbarFound { get { return _hTaskbar != IntPtr.Zero; } }
 
@@ -50,13 +50,17 @@ namespace MetriX.Services
             }
 
             NativeMethods.RECT tbRect = new NativeMethods.RECT();
-            if (_hTaskbar != IntPtr.Zero && NativeMethods.GetWindowRect(_hTaskbar, out tbRect))
+            bool hasTb = _hTaskbar != IntPtr.Zero && NativeMethods.GetWindowRect(_hTaskbar, out tbRect);
+            if (hasTb && tbRect.Width > 100 && tbRect.Height > 10)
             {
-                _lastTaskbarRect = tbRect;
+                _lastValidTaskbarRect = tbRect;
+            }
+            else if (_lastValidTaskbarRect.Width > 100)
+            {
+                tbRect = _lastValidTaskbarRect;
             }
             else
             {
-                // Fallback to Primary Screen working area taskbar calculation
                 var scr = Screen.PrimaryScreen;
                 tbRect = new NativeMethods.RECT
                 {
@@ -65,15 +69,32 @@ namespace MetriX.Services
                     Right = scr.Bounds.Width,
                     Bottom = scr.Bounds.Height
                 };
+                _lastValidTaskbarRect = tbRect;
             }
 
             NativeMethods.RECT trayRect = new NativeMethods.RECT();
             bool hasTray = _hTrayNotify != IntPtr.Zero && NativeMethods.GetWindowRect(_hTrayNotify, out trayRect);
-            if (hasTray) _lastTrayRect = trayRect;
+            if (hasTray && trayRect.Width > 10 && trayRect.Height > 10 && trayRect.Left > 0)
+            {
+                _lastValidTrayRect = trayRect;
+            }
+            else if (_lastValidTrayRect.Left > 0)
+            {
+                trayRect = _lastValidTrayRect;
+                hasTray = true;
+            }
 
             NativeMethods.RECT taskListRect = new NativeMethods.RECT();
             bool hasTaskList = _hTaskList != IntPtr.Zero && NativeMethods.GetWindowRect(_hTaskList, out taskListRect);
-            if (hasTaskList) _lastTaskListRect = taskListRect;
+            if (hasTaskList && taskListRect.Width > 10 && taskListRect.Right > 0)
+            {
+                _lastValidTaskListRect = taskListRect;
+            }
+            else if (_lastValidTaskListRect.Right > 0)
+            {
+                taskListRect = _lastValidTaskListRect;
+                hasTaskList = true;
+            }
 
             int targetX = 0;
             int targetY = tbRect.Top + (tbRect.Height - widgetHeight) / 2;
@@ -108,6 +129,10 @@ namespace MetriX.Services
                     {
                         targetX = trayRect.Left - widgetWidth - 4 + (config != null ? config.OffsetX : 0);
                     }
+                    else if (_lastValidTrayRect.Left > 0)
+                    {
+                        targetX = _lastValidTrayRect.Left - widgetWidth - 4 + (config != null ? config.OffsetX : 0);
+                    }
                     else
                     {
                         targetX = tbRect.Right - widgetWidth - 180 + (config != null ? config.OffsetX : 0);
@@ -136,10 +161,10 @@ namespace MetriX.Services
             }
 
             NativeMethods.RECT curTb;
-            if (NativeMethods.GetWindowRect(_hTaskbar, out curTb))
+            if (NativeMethods.GetWindowRect(_hTaskbar, out curTb) && curTb.Width > 100)
             {
-                if (curTb.Left != _lastTaskbarRect.Left || curTb.Top != _lastTaskbarRect.Top ||
-                    curTb.Right != _lastTaskbarRect.Right || curTb.Bottom != _lastTaskbarRect.Bottom)
+                if (curTb.Left != _lastValidTaskbarRect.Left || curTb.Top != _lastValidTaskbarRect.Top ||
+                    curTb.Right != _lastValidTaskbarRect.Right || curTb.Bottom != _lastValidTaskbarRect.Bottom)
                 {
                     return true;
                 }
@@ -148,10 +173,10 @@ namespace MetriX.Services
             if (_hTrayNotify != IntPtr.Zero)
             {
                 NativeMethods.RECT curTray;
-                if (NativeMethods.GetWindowRect(_hTrayNotify, out curTray))
+                if (NativeMethods.GetWindowRect(_hTrayNotify, out curTray) && curTray.Width > 10)
                 {
-                    if (curTray.Left != _lastTrayRect.Left || curTray.Top != _lastTrayRect.Top ||
-                        curTray.Right != _lastTrayRect.Right || curTray.Bottom != _lastTrayRect.Bottom)
+                    if (curTray.Left != _lastValidTrayRect.Left || curTray.Top != _lastValidTrayRect.Top ||
+                        curTray.Right != _lastValidTrayRect.Right || curTray.Bottom != _lastValidTrayRect.Bottom)
                     {
                         return true;
                     }

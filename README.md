@@ -1,8 +1,13 @@
+<p align="center">
+  <img src="assets/icon_256.png" width="128" height="128" alt="metriX Icon" />
+</p>
+
 # metriX ⚡
 > **Super simple, lightweight, and visually seamless download/upload speed indicator for the Windows 11 taskbar.**
 
-[![Windows 11 Native](https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011-0078D4?logo=windows)](https://github.com/SuryakiranMK/MetriX)
-[![Binary Size](https://img.shields.io/badge/Binary%20Size-~55%20KB-success)](#performance)
+[![Release](https://img.shields.io/github/v/release/SuryakiranMK/MetriX?color=00E5FF)](https://github.com/SuryakiranMK/MetriX/releases)
+[![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011-0078D4?logo=windows)](https://github.com/SuryakiranMK/MetriX)
+[![Binary Size](https://img.shields.io/badge/Binary%20Size-~81%20KB-success)](#performance)
 [![CPU Usage](https://img.shields.io/badge/CPU%20Usage-%3C%200.01%25-brightgreen)](#performance)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 

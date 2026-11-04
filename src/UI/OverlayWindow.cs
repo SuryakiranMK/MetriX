@@ -302,8 +302,8 @@ namespace MetriX.UI
                     ref blend,
                     NativeMethods.ULW_ALPHA);
 
-                // Ensure it stays at taskbar layer without stealing focus
-                NativeMethods.SetWindowPos(Handle, NativeMethods.HWND_TOP, bounds.X, bounds.Y, width, height,
+                // Ensure it stays at topmost taskbar layer without stealing focus
+                NativeMethods.SetWindowPos(Handle, NativeMethods.HWND_TOPMOST, bounds.X, bounds.Y, width, height,
                     NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_SHOWWINDOW);
             }
             finally

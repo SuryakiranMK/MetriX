@@ -22,6 +22,7 @@ if (-not (Test-Path $outputDir)) {
 
 $outputExe = Join-Path $outputDir "metriX.exe"
 $manifestPath = Join-Path $PSScriptRoot "app.manifest"
+$iconPath = Join-Path $PSScriptRoot "app.ico"
 
 $sources = Get-ChildItem -Path (Join-Path $PSScriptRoot "src") -Filter "*.cs" -Recurse | Select-Object -ExpandProperty FullName
 
@@ -39,6 +40,7 @@ $compilerArgs = @(
     "/platform:$Platform",
     "/out:$outputExe",
     "/win32manifest:$manifestPath",
+    "/win32icon:$iconPath",
     "/optimize+"
 ) + $refArgs + $sources
 
