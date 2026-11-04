@@ -48,8 +48,10 @@ namespace MetriX.Model
         public LayoutMode Layout { get; set; }
         public string FontFamily { get; set; }
         public float FontSize { get; set; }
+        public float UnitFontSize { get; set; }
         public bool FontBold { get; set; }
 
+        public bool AutoTheme { get; set; }
         public string UploadColor { get; set; }
         public string DownloadColor { get; set; }
         public string LabelColor { get; set; }
@@ -62,6 +64,11 @@ namespace MetriX.Model
         public int PaddingY { get; set; }
         public int ItemSpacing { get; set; }
         public bool ShowHoverHighlight { get; set; }
+
+        public bool IdleDimming { get; set; }
+        public double IdleThresholdKb { get; set; }
+        public int IdleOpacityPercent { get; set; }
+        public int OverallOpacityPercent { get; set; }
 
         public int UpdateIntervalMs { get; set; }
         public string SelectedAdapterAlias { get; set; }
@@ -78,8 +85,10 @@ namespace MetriX.Model
             Layout = LayoutMode.Stacked;
             FontFamily = "Segoe UI Variable Text";
             FontSize = 9.0f;
+            UnitFontSize = 7.5f;
             FontBold = false;
 
+            AutoTheme = true;
             // Fluent accent colors with high contrast on dark taskbar
             UploadColor = "#4CC2FF";    // Soft Windows Blue / Cyan
             DownloadColor = "#6CCB5F";  // Soft Windows Green
@@ -93,6 +102,11 @@ namespace MetriX.Model
             PaddingY = 2;
             ItemSpacing = 4;
             ShowHoverHighlight = true;
+
+            IdleDimming = true;
+            IdleThresholdKb = 1.0;
+            IdleOpacityPercent = 45;
+            OverallOpacityPercent = 100;
 
             UpdateIntervalMs = 1000;
             SelectedAdapterAlias = ""; // All active adapters aggregated

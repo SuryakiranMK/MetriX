@@ -180,8 +180,10 @@ namespace MetriX.UI
 
             string fontName = string.IsNullOrEmpty(cfg.FontFamily) ? "Segoe UI Variable Text" : cfg.FontFamily;
             FontStyle style = cfg.FontBold ? FontStyle.Bold : FontStyle.Regular;
+            float unitSizePt = cfg.UnitFontSize > 0 ? cfg.UnitFontSize : Math.Max(6.0f, cfg.FontSize * 0.8f);
 
             using (Font font = CreateFontSafely(fontName, cfg.FontSize * dpiScale, style))
+            using (Font unitFont = CreateFontSafely(fontName, unitSizePt * dpiScale, FontStyle.Regular))
             using (Bitmap dummyBmp = new Bitmap(1, 1))
             using (Graphics g = Graphics.FromImage(dummyBmp))
             {
@@ -196,7 +198,7 @@ namespace MetriX.UI
 
                 SizeF arrowSize = g.MeasureString(upArrow, font);
                 SizeF valSize = g.MeasureString(sampleVal, font);
-                SizeF unitSize = g.MeasureString(sampleUnit, font);
+                SizeF unitSize = g.MeasureString(sampleUnit, unitFont);
 
                 if (cfg.Layout == LayoutMode.Stacked)
                 {
@@ -266,12 +268,26 @@ namespace MetriX.UI
 
                     string fontName = string.IsNullOrEmpty(cfg.FontFamily) ? "Segoe UI Variable Text" : cfg.FontFamily;
                     FontStyle style = cfg.FontBold ? FontStyle.Bold : FontStyle.Regular;
+                    float unitSizePt = cfg.UnitFontSize > 0 ? cfg.UnitFontSize : Math.Max(6.0f, cfg.FontSize * 0.8f);
 
                     using (Font font = CreateFontSafely(fontName, cfg.FontSize * dpiScale, style))
+                    using (Font unitFont = CreateFontSafely(fontName, unitSizePt * dpiScale, FontStyle.Regular))
                     {
-                        Color upColor = ParseColor(cfg.UploadColor, Color.FromArgb(76, 194, 255));
-                        Color dnColor = ParseColor(cfg.DownloadColor, Color.FromArgb(108, 203, 95));
-                        Color lblColor = ParseColor(cfg.LabelColor, Color.FromArgb(208, 208, 208));
+                        Color upColor, dnColor, lblColor;
+                        if (cfg.AutoTheme)
+                        {
+                            string uHex, dHex, lHex;
+                            ThemeHelper.GetThemeColors(ThemeHelper.IsSystemLightTheme(), out uHex, out dHex, out lHex);
+                            upColor = ParseColor(uHex, Color.FromArgb(76, 194, 255));
+                            dnColor = ParseColor(dHex, Color.FromArgb(108, 203, 95));
+                            lblColor = ParseColor(lHex, Color.FromArgb(208, 208, 208));
+                        }
+                        else
+                        {
+                            upColor = ParseColor(cfg.UploadColor, Color.FromArgb(76, 194, 255));
+                            dnColor = ParseColor(cfg.DownloadColor, Color.FromArgb(108, 203, 95));
+                            lblColor = ParseColor(cfg.LabelColor, Color.FromArgb(208, 208, 208));
+                        }
 
                         string upArrow = GetArrowGlyph(cfg.ArrowStyle, true);
                         string dnArrow = GetArrowGlyph(cfg.ArrowStyle, false);
@@ -280,11 +296,11 @@ namespace MetriX.UI
 
                         if (cfg.Layout == LayoutMode.Stacked)
                         {
-                            DrawStackedLayout(g, font, width, height, padX, upArrow, dnArrow, stats, upColor, dnColor, lblColor, dpiScale);
+                            DrawStackedLayout(g, font, unitFont, width, height, padX, upArrow, dnArrow, stats, upColor, dnColor, lblColor, dpiScale);
                         }
                         else
                         {
-                            DrawHorizontalLayout(g, font, width, height, padX, upArrow, dnArrow, stats, upColor, dnColor, lblColor, cfg.ItemSpacing, dpiScale);
+                            DrawHorizontalLayout(g, font, unitFont, width, height, padX, upArrow, dnArrow, stats, upColor, dnColor, lblColor, cfg.ItemSpacing, dpiScale);
                         }
                     }
                 }
@@ -296,7 +312,16 @@ namespace MetriX.UI
                 NativeMethods.BLENDFUNCTION blend = new NativeMethods.BLENDFUNCTION();
                 blend.BlendOp = NativeMethods.AC_SRC_OVER;
                 blend.BlendFlags = 0;
-                blend.SourceConstantAlpha = 255;
+
+                bool isIdle = cfg.IdleDimming && !_isHovered &&
+                              (stats.DownloadSpeedBytesPerSec < (cfg.IdleThresholdKb * 1024.0)) &&
+                              (stats.UploadSpeedBytesPerSec < (cfg.IdleThresholdKb * 1024.0));
+
+                float baseOpacity = Math.Max(0.2f, Math.Min(1.0f, cfg.OverallOpacityPercent / 100.0f));
+                float idleMultiplier = isIdle ? (cfg.IdleOpacityPercent / 100.0f) : 1.0f;
+                byte sourceAlpha = (byte)Math.Max(15, Math.Min(255, (int)(baseOpacity * idleMultiplier * 255)));
+
+                blend.SourceConstantAlpha = sourceAlpha;
                 blend.AlphaFormat = NativeMethods.AC_SRC_ALPHA;
 
                 NativeMethods.UpdateLayeredWindow(
@@ -323,12 +348,14 @@ namespace MetriX.UI
             }
         }
 
-        private void DrawStackedLayout(Graphics g, Font font, int width, int height, int padX,
+        private void DrawStackedLayout(Graphics g, Font font, Font unitFont, int width, int height, int padX,
             string upArrow, string dnArrow, NetworkStats stats, Color upColor, Color dnColor, Color lblColor, float dpiScale)
         {
             int rowHeight = height / 2;
             int yRow1 = 2;
             int yRow2 = rowHeight - 2;
+
+            float baselineOffset = (font.GetHeight(g) - unitFont.GetHeight(g)) * 0.75f;
 
             using (Brush upBrush = new SolidBrush(upColor))
             using (Brush dnBrush = new SolidBrush(dnColor))
@@ -339,8 +366,6 @@ namespace MetriX.UI
                 SizeF dnArrowSz = g.MeasureString(dnArrow, font);
                 SizeF upValSz = g.MeasureString(stats.UploadFormatted, font);
                 SizeF dnValSz = g.MeasureString(stats.DownloadFormatted, font);
-                SizeF upUnitSz = g.MeasureString(stats.UploadUnit, font);
-                SizeF dnUnitSz = g.MeasureString(stats.DownloadUnit, font);
 
                 float maxArrowW = Math.Max(upArrowSz.Width, dnArrowSz.Width);
                 float maxValW = Math.Max(upValSz.Width, dnValSz.Width);
@@ -356,7 +381,7 @@ namespace MetriX.UI
                 float numX1 = x1 + (maxValW - upValSz.Width);
                 g.DrawString(stats.UploadFormatted, font, upBrush, numX1, yRow1);
                 x1 += maxValW + 2;
-                g.DrawString(stats.UploadUnit, font, lblBrush, x1, yRow1);
+                g.DrawString(stats.UploadUnit, unitFont, lblBrush, x1, yRow1 + baselineOffset);
 
                 // Row 2 (Download)
                 float x2 = padX;
@@ -368,14 +393,15 @@ namespace MetriX.UI
                 float numX2 = x2 + (maxValW - dnValSz.Width);
                 g.DrawString(stats.DownloadFormatted, font, dnBrush, numX2, yRow2);
                 x2 += maxValW + 2;
-                g.DrawString(stats.DownloadUnit, font, lblBrush, x2, yRow2);
+                g.DrawString(stats.DownloadUnit, unitFont, lblBrush, x2, yRow2 + baselineOffset);
             }
         }
 
-        private void DrawHorizontalLayout(Graphics g, Font font, int width, int height, int padX,
+        private void DrawHorizontalLayout(Graphics g, Font font, Font unitFont, int width, int height, int padX,
             string upArrow, string dnArrow, NetworkStats stats, Color upColor, Color dnColor, Color lblColor, int itemSpacing, float dpiScale)
         {
             float yPos = (height - font.GetHeight(g)) / 2f;
+            float baselineOffset = (font.GetHeight(g) - unitFont.GetHeight(g)) * 0.75f;
 
             using (Brush upBrush = new SolidBrush(upColor))
             using (Brush dnBrush = new SolidBrush(dnColor))
@@ -391,8 +417,8 @@ namespace MetriX.UI
                 }
                 g.DrawString(stats.UploadFormatted, font, upBrush, x, yPos);
                 x += g.MeasureString(stats.UploadFormatted, font).Width + 1;
-                g.DrawString(stats.UploadUnit, font, lblBrush, x, yPos);
-                x += g.MeasureString(stats.UploadUnit, font).Width + DpiHelper.Scale(itemSpacing + 6, dpiScale);
+                g.DrawString(stats.UploadUnit, unitFont, lblBrush, x, yPos + baselineOffset);
+                x += g.MeasureString(stats.UploadUnit, unitFont).Width + DpiHelper.Scale(itemSpacing + 6, dpiScale);
 
                 // Download block
                 if (!string.IsNullOrEmpty(dnArrow))
@@ -402,7 +428,7 @@ namespace MetriX.UI
                 }
                 g.DrawString(stats.DownloadFormatted, font, dnBrush, x, yPos);
                 x += g.MeasureString(stats.DownloadFormatted, font).Width + 1;
-                g.DrawString(stats.DownloadUnit, font, lblBrush, x, yPos);
+                g.DrawString(stats.DownloadUnit, unitFont, lblBrush, x, yPos + baselineOffset);
             }
         }
 

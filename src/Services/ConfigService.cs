@@ -72,8 +72,14 @@ namespace MetriX.Services
                         case "FontSize":
                             float fs; if (float.TryParse(val, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out fs)) config.FontSize = fs;
                             break;
+                        case "UnitFontSize":
+                            float ufs; if (float.TryParse(val, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out ufs)) config.UnitFontSize = ufs;
+                            break;
                         case "FontBold":
                             bool fb; if (bool.TryParse(val, out fb)) config.FontBold = fb;
+                            break;
+                        case "AutoTheme":
+                            bool at; if (bool.TryParse(val, out at)) config.AutoTheme = at;
                             break;
                         case "UploadColor":
                             config.UploadColor = val;
@@ -106,6 +112,18 @@ namespace MetriX.Services
                             break;
                         case "ShowHoverHighlight":
                             bool hh; if (bool.TryParse(val, out hh)) config.ShowHoverHighlight = hh;
+                            break;
+                        case "IdleDimming":
+                            bool idm; if (bool.TryParse(val, out idm)) config.IdleDimming = idm;
+                            break;
+                        case "IdleThresholdKb":
+                            double itk; if (double.TryParse(val, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out itk)) config.IdleThresholdKb = itk;
+                            break;
+                        case "IdleOpacityPercent":
+                            int iop; if (int.TryParse(val, out iop)) config.IdleOpacityPercent = Math.Max(10, Math.Min(100, iop));
+                            break;
+                        case "OverallOpacityPercent":
+                            int oop; if (int.TryParse(val, out oop)) config.OverallOpacityPercent = Math.Max(20, Math.Min(100, oop));
                             break;
                         case "UpdateIntervalMs":
                             int ui; if (int.TryParse(val, out ui)) config.UpdateIntervalMs = Math.Max(250, ui);
@@ -147,7 +165,9 @@ namespace MetriX.Services
                     sw.WriteLine("  \"Layout\": \"" + config.Layout + "\",");
                     sw.WriteLine("  \"FontFamily\": \"" + config.FontFamily + "\",");
                     sw.WriteLine("  \"FontSize\": " + config.FontSize.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) + ",");
+                    sw.WriteLine("  \"UnitFontSize\": " + config.UnitFontSize.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) + ",");
                     sw.WriteLine("  \"FontBold\": " + config.FontBold.ToString().ToLowerInvariant() + ",");
+                    sw.WriteLine("  \"AutoTheme\": " + config.AutoTheme.ToString().ToLowerInvariant() + ",");
                     sw.WriteLine("  \"UploadColor\": \"" + config.UploadColor + "\",");
                     sw.WriteLine("  \"DownloadColor\": \"" + config.DownloadColor + "\",");
                     sw.WriteLine("  \"LabelColor\": \"" + config.LabelColor + "\",");
@@ -158,6 +178,10 @@ namespace MetriX.Services
                     sw.WriteLine("  \"PaddingY\": " + config.PaddingY + ",");
                     sw.WriteLine("  \"ItemSpacing\": " + config.ItemSpacing + ",");
                     sw.WriteLine("  \"ShowHoverHighlight\": " + config.ShowHoverHighlight.ToString().ToLowerInvariant() + ",");
+                    sw.WriteLine("  \"IdleDimming\": " + config.IdleDimming.ToString().ToLowerInvariant() + ",");
+                    sw.WriteLine("  \"IdleThresholdKb\": " + config.IdleThresholdKb.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) + ",");
+                    sw.WriteLine("  \"IdleOpacityPercent\": " + config.IdleOpacityPercent + ",");
+                    sw.WriteLine("  \"OverallOpacityPercent\": " + config.OverallOpacityPercent + ",");
                     sw.WriteLine("  \"UpdateIntervalMs\": " + config.UpdateIntervalMs + ",");
                     sw.WriteLine("  \"SelectedAdapterAlias\": \"" + (config.SelectedAdapterAlias ?? "") + "\",");
                     sw.WriteLine("  \"StartWithWindows\": " + config.StartWithWindows.ToString().ToLowerInvariant() + ",");

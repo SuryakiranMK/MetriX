@@ -49,6 +49,7 @@
     <Compile Include="src\Services\ConfigService.cs" />
     <Compile Include="src\Services\NetworkMonitor.cs" />
     <Compile Include="src\Services\TaskbarTracker.cs" />
+    <Compile Include="src\Services\ThemeHelper.cs" />
     <Compile Include="src\UI\OverlayWindow.cs" />
     <Compile Include="src\UI\SettingsForm.cs" />
     <Compile Include="src\UI\TrayApplicationContext.cs" />

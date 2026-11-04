@@ -26,12 +26,18 @@ namespace MetriX.UI
         private ComboBox _cbLayout;
         private ComboBox _cbFont;
         private NumericUpDown _nudFontSize;
+        private NumericUpDown _nudUnitFontSize;
         private CheckBox _chkFontBold;
 
+        private CheckBox _chkAutoTheme;
         private Button _btnUploadColor;
         private Button _btnDownloadColor;
         private Button _btnLabelColor;
         private CheckBox _chkHoverHighlight;
+
+        private CheckBox _chkIdleDimming;
+        private NumericUpDown _nudIdleOpacity;
+        private NumericUpDown _nudOverallOpacity;
 
         private ComboBox _cbArrowStyle;
         private ComboBox _cbUnitMode;
@@ -67,7 +73,9 @@ namespace MetriX.UI
                 Layout = src.Layout,
                 FontFamily = src.FontFamily,
                 FontSize = src.FontSize,
+                UnitFontSize = src.UnitFontSize,
                 FontBold = src.FontBold,
+                AutoTheme = src.AutoTheme,
                 UploadColor = src.UploadColor,
                 DownloadColor = src.DownloadColor,
                 LabelColor = src.LabelColor,
@@ -78,6 +86,10 @@ namespace MetriX.UI
                 PaddingY = src.PaddingY,
                 ItemSpacing = src.ItemSpacing,
                 ShowHoverHighlight = src.ShowHoverHighlight,
+                IdleDimming = src.IdleDimming,
+                IdleThresholdKb = src.IdleThresholdKb,
+                IdleOpacityPercent = src.IdleOpacityPercent,
+                OverallOpacityPercent = src.OverallOpacityPercent,
                 UpdateIntervalMs = src.UpdateIntervalMs,
                 SelectedAdapterAlias = src.SelectedAdapterAlias,
                 StartWithWindows = src.StartWithWindows,
@@ -270,14 +282,31 @@ namespace MetriX.UI
             y += 38;
 
             AddLabel(page, "Font Size (pt):", 20, y);
-            _nudFontSize = new NumericUpDown { Left = 150, Top = y - 3, Width = 90, Minimum = 7, Maximum = 20, DecimalPlaces = 1 };
+            _nudFontSize = new NumericUpDown { Left = 130, Top = y - 3, Width = 65, Minimum = 7, Maximum = 20, DecimalPlaces = 1 };
             _nudFontSize.ValueChanged += (s, e) => { _workingConfig.FontSize = (float)_nudFontSize.Value; _previewPanel.Invalidate(); };
             page.Controls.Add(_nudFontSize);
 
-            _chkFontBold = new CheckBox { Text = "Bold Weight", Left = 260, Top = y - 3, AutoSize = true };
+            AddLabel(page, "Unit Size:", 205, y);
+            _nudUnitFontSize = new NumericUpDown { Left = 275, Top = y - 3, Width = 65, Minimum = 5, Maximum = 16, DecimalPlaces = 1 };
+            _nudUnitFontSize.ValueChanged += (s, e) => { _workingConfig.UnitFontSize = (float)_nudUnitFontSize.Value; _previewPanel.Invalidate(); };
+            page.Controls.Add(_nudUnitFontSize);
+
+            _chkFontBold = new CheckBox { Text = "Bold", Left = 360, Top = y - 3, AutoSize = true };
             _chkFontBold.CheckedChanged += (s, e) => { _workingConfig.FontBold = _chkFontBold.Checked; _previewPanel.Invalidate(); };
             page.Controls.Add(_chkFontBold);
-            y += 42;
+            y += 38;
+
+            _chkAutoTheme = new CheckBox { Text = "Auto-detect Windows Dark/Light taskbar theme colors", Left = 20, Top = y, AutoSize = true };
+            _chkAutoTheme.CheckedChanged += (s, e) =>
+            {
+                _workingConfig.AutoTheme = _chkAutoTheme.Checked;
+                _btnUploadColor.Enabled = !_workingConfig.AutoTheme;
+                _btnDownloadColor.Enabled = !_workingConfig.AutoTheme;
+                _btnLabelColor.Enabled = !_workingConfig.AutoTheme;
+                _previewPanel.Invalidate();
+            };
+            page.Controls.Add(_chkAutoTheme);
+            y += 36;
 
             AddLabel(page, "Upload Speed Color:", 20, y);
             _btnUploadColor = new Button { Left = 150, Top = y - 5, Width = 100, Height = 28, FlatStyle = FlatStyle.Flat };
@@ -379,6 +408,28 @@ namespace MetriX.UI
             _nudSpacing = new NumericUpDown { Left = 160, Top = y - 3, Width = 90, Minimum = 0, Maximum = 30 };
             _nudSpacing.ValueChanged += (s, e) => { _workingConfig.ItemSpacing = (int)_nudSpacing.Value; _previewPanel.Invalidate(); };
             page.Controls.Add(_nudSpacing);
+            y += 38;
+
+            AddLabel(page, "Overall Opacity (%):", 20, y);
+            _nudOverallOpacity = new NumericUpDown { Left = 160, Top = y - 3, Width = 90, Minimum = 30, Maximum = 100 };
+            _nudOverallOpacity.ValueChanged += (s, e) => { _workingConfig.OverallOpacityPercent = (int)_nudOverallOpacity.Value; _previewPanel.Invalidate(); };
+            page.Controls.Add(_nudOverallOpacity);
+            y += 36;
+
+            _chkIdleDimming = new CheckBox { Text = "Dim display when network is idle (< 1 KB/s)", Left = 20, Top = y, AutoSize = true };
+            _chkIdleDimming.CheckedChanged += (s, e) =>
+            {
+                _workingConfig.IdleDimming = _chkIdleDimming.Checked;
+                _nudIdleOpacity.Enabled = _chkIdleDimming.Checked;
+                _previewPanel.Invalidate();
+            };
+            page.Controls.Add(_chkIdleDimming);
+            y += 30;
+
+            AddLabel(page, "Idle Dim Opacity (%):", 40, y);
+            _nudIdleOpacity = new NumericUpDown { Left = 175, Top = y - 3, Width = 75, Minimum = 15, Maximum = 90 };
+            _nudIdleOpacity.ValueChanged += (s, e) => { _workingConfig.IdleOpacityPercent = (int)_nudIdleOpacity.Value; _previewPanel.Invalidate(); };
+            page.Controls.Add(_nudIdleOpacity);
         }
 
         private void BuildSystemTab(TabPage page)
@@ -457,10 +508,21 @@ namespace MetriX.UI
             int fIdx = _cbFont.FindStringExact(_workingConfig.FontFamily);
             _cbFont.SelectedIndex = fIdx >= 0 ? fIdx : 0;
             _nudFontSize.Value = (decimal)_workingConfig.FontSize;
+            _nudUnitFontSize.Value = (decimal)_workingConfig.UnitFontSize;
             _chkFontBold.Checked = _workingConfig.FontBold;
+
+            _chkAutoTheme.Checked = _workingConfig.AutoTheme;
+            _btnUploadColor.Enabled = !_workingConfig.AutoTheme;
+            _btnDownloadColor.Enabled = !_workingConfig.AutoTheme;
+            _btnLabelColor.Enabled = !_workingConfig.AutoTheme;
 
             UpdateColorButtons();
             _chkHoverHighlight.Checked = _workingConfig.ShowHoverHighlight;
+
+            _nudOverallOpacity.Value = _workingConfig.OverallOpacityPercent;
+            _chkIdleDimming.Checked = _workingConfig.IdleDimming;
+            _nudIdleOpacity.Value = _workingConfig.IdleOpacityPercent;
+            _nudIdleOpacity.Enabled = _workingConfig.IdleDimming;
 
             _cbArrowStyle.SelectedIndex = (int)_workingConfig.ArrowStyle;
             _cbUnitMode.SelectedIndex = (int)_workingConfig.UnitMode;
@@ -522,12 +584,30 @@ namespace MetriX.UI
 
             string fontName = string.IsNullOrEmpty(_workingConfig.FontFamily) ? "Segoe UI Variable Text" : _workingConfig.FontFamily;
             FontStyle style = _workingConfig.FontBold ? FontStyle.Bold : FontStyle.Regular;
+            float unitSizePt = _workingConfig.UnitFontSize > 0 ? _workingConfig.UnitFontSize : Math.Max(6.0f, _workingConfig.FontSize * 0.8f);
+
+            string uHex, dHex, lHex;
+            if (_workingConfig.AutoTheme)
+            {
+                ThemeHelper.GetThemeColors(false, out uHex, out dHex, out lHex);
+            }
+            else
+            {
+                uHex = _workingConfig.UploadColor;
+                dHex = _workingConfig.DownloadColor;
+                lHex = _workingConfig.LabelColor;
+            }
+
+            int alpha = (int)(Math.Max(0.3f, _workingConfig.OverallOpacityPercent / 100.0f) * 255);
 
             using (Font font = new Font(fontName, _workingConfig.FontSize, style))
-            using (Brush upBrush = new SolidBrush(ColorTranslator.FromHtml(_workingConfig.UploadColor)))
-            using (Brush dnBrush = new SolidBrush(ColorTranslator.FromHtml(_workingConfig.DownloadColor)))
-            using (Brush lblBrush = new SolidBrush(ColorTranslator.FromHtml(_workingConfig.LabelColor)))
+            using (Font unitFont = new Font(fontName, unitSizePt, FontStyle.Regular))
+            using (Brush upBrush = new SolidBrush(Color.FromArgb(alpha, ColorTranslator.FromHtml(uHex))))
+            using (Brush dnBrush = new SolidBrush(Color.FromArgb(alpha, ColorTranslator.FromHtml(dHex))))
+            using (Brush lblBrush = new SolidBrush(Color.FromArgb(alpha, ColorTranslator.FromHtml(lHex))))
             {
+                float baselineOffset = (font.GetHeight(g) - unitFont.GetHeight(g)) * 0.75f;
+
                 string upArrow = _workingConfig.ArrowStyle == ArrowStyle.Triangle ? "▲" :
                                  _workingConfig.ArrowStyle == ArrowStyle.Arrow ? "↑" :
                                  _workingConfig.ArrowStyle == ArrowStyle.Letter ? "U:" : "";
@@ -554,7 +634,7 @@ namespace MetriX.UI
                     }
                     g.DrawString(sampleUpVal, font, upBrush, x1, y1);
                     x1 += g.MeasureString(sampleUpVal, font).Width + 2;
-                    g.DrawString(sampleUnit, font, lblBrush, x1, y1);
+                    g.DrawString(sampleUnit, unitFont, lblBrush, x1, y1 + baselineOffset);
 
                     float x2 = startX;
                     if (!string.IsNullOrEmpty(dnArrow))
@@ -564,7 +644,7 @@ namespace MetriX.UI
                     }
                     g.DrawString(sampleDnVal, font, dnBrush, x2, y2);
                     x2 += g.MeasureString(sampleDnVal, font).Width + 2;
-                    g.DrawString(sampleUnit, font, lblBrush, x2, y2);
+                    g.DrawString(sampleUnit, unitFont, lblBrush, x2, y2 + baselineOffset);
                 }
                 else
                 {
@@ -578,8 +658,8 @@ namespace MetriX.UI
                     }
                     g.DrawString(sampleUpVal, font, upBrush, x, y);
                     x += g.MeasureString(sampleUpVal, font).Width + 2;
-                    g.DrawString(sampleUnit, font, lblBrush, x, y);
-                    x += g.MeasureString(sampleUnit, font).Width + _workingConfig.ItemSpacing + 10;
+                    g.DrawString(sampleUnit, unitFont, lblBrush, x, y + baselineOffset);
+                    x += g.MeasureString(sampleUnit, unitFont).Width + _workingConfig.ItemSpacing + 10;
 
                     if (!string.IsNullOrEmpty(dnArrow))
                     {
@@ -588,7 +668,7 @@ namespace MetriX.UI
                     }
                     g.DrawString(sampleDnVal, font, dnBrush, x, y);
                     x += g.MeasureString(sampleDnVal, font).Width + 2;
-                    g.DrawString(sampleUnit, font, lblBrush, x, y);
+                    g.DrawString(sampleUnit, unitFont, lblBrush, x, y + baselineOffset);
                 }
             }
         }
