@@ -1,0 +1,203 @@
+using System;
+using System.IO;
+using System.Reflection;
+using System.Windows.Forms;
+using Microsoft.Win32;
+using MetriX.Model;
+
+namespace MetriX.Services
+{
+    public class ConfigService
+    {
+        private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
+        private const string AppName = "MetriX";
+        private readonly string _configFilePath;
+
+        public AppConfig Config { get; private set; }
+
+        public ConfigService()
+        {
+            string appDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            if (string.IsNullOrEmpty(appDir))
+            {
+                appDir = AppDomain.CurrentDomain.BaseDirectory;
+            }
+            _configFilePath = Path.Combine(appDir, "config.json");
+            Config = Load();
+        }
+
+        public AppConfig Load()
+        {
+            var config = new AppConfig();
+            if (!File.Exists(_configFilePath))
+            {
+                Save(config);
+                return config;
+            }
+
+            try
+            {
+                string[] lines = File.ReadAllLines(_configFilePath);
+                foreach (string rawLine in lines)
+                {
+                    string line = rawLine.Trim();
+                    if (string.IsNullOrEmpty(line) || line.StartsWith("//") || line == "{" || line == "}")
+                        continue;
+
+                    int colonIdx = line.IndexOf(':');
+                    if (colonIdx <= 0) continue;
+
+                    string key = line.Substring(0, colonIdx).Trim().Trim('"', ' ');
+                    string val = line.Substring(colonIdx + 1).Trim().TrimEnd(',').Trim().Trim('"', ' ');
+
+                    switch (key)
+                    {
+                        case "Position":
+                            PositionMode pm;
+                            if (Enum.TryParse(val, true, out pm)) config.Position = pm;
+                            break;
+                        case "OffsetX":
+                            int ox; if (int.TryParse(val, out ox)) config.OffsetX = ox;
+                            break;
+                        case "OffsetY":
+                            int oy; if (int.TryParse(val, out oy)) config.OffsetY = oy;
+                            break;
+                        case "Layout":
+                            LayoutMode lm;
+                            if (Enum.TryParse(val, true, out lm)) config.Layout = lm;
+                            break;
+                        case "FontFamily":
+                            config.FontFamily = val;
+                            break;
+                        case "FontSize":
+                            float fs; if (float.TryParse(val, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out fs)) config.FontSize = fs;
+                            break;
+                        case "FontBold":
+                            bool fb; if (bool.TryParse(val, out fb)) config.FontBold = fb;
+                            break;
+                        case "UploadColor":
+                            config.UploadColor = val;
+                            break;
+                        case "DownloadColor":
+                            config.DownloadColor = val;
+                            break;
+                        case "LabelColor":
+                            config.LabelColor = val;
+                            break;
+                        case "ArrowStyle":
+                            ArrowStyle ast;
+                            if (Enum.TryParse(val, true, out ast)) config.ArrowStyle = ast;
+                            break;
+                        case "UnitMode":
+                            UnitMode um;
+                            if (Enum.TryParse(val, true, out um)) config.UnitMode = um;
+                            break;
+                        case "DecimalPlaces":
+                            int dp; if (int.TryParse(val, out dp)) config.DecimalPlaces = dp;
+                            break;
+                        case "PaddingX":
+                            int px; if (int.TryParse(val, out px)) config.PaddingX = px;
+                            break;
+                        case "PaddingY":
+                            int py; if (int.TryParse(val, out py)) config.PaddingY = py;
+                            break;
+                        case "ItemSpacing":
+                            int ispc; if (int.TryParse(val, out ispc)) config.ItemSpacing = ispc;
+                            break;
+                        case "ShowHoverHighlight":
+                            bool hh; if (bool.TryParse(val, out hh)) config.ShowHoverHighlight = hh;
+                            break;
+                        case "UpdateIntervalMs":
+                            int ui; if (int.TryParse(val, out ui)) config.UpdateIntervalMs = Math.Max(250, ui);
+                            break;
+                        case "SelectedAdapterAlias":
+                            config.SelectedAdapterAlias = val;
+                            break;
+                        case "StartWithWindows":
+                            bool sww; if (bool.TryParse(val, out sww)) config.StartWithWindows = sww;
+                            break;
+                        case "LeftClickAction":
+                            LeftClickAction lca;
+                            if (Enum.TryParse(val, true, out lca)) config.LeftClickAction = lca;
+                            break;
+                    }
+                }
+            }
+            catch
+            {
+                // In case of parsing error, return defaults
+            }
+
+            return config;
+        }
+
+        public void Save(AppConfig config)
+        {
+            if (config == null) return;
+            Config = config;
+
+            try
+            {
+                using (var sw = new StreamWriter(_configFilePath, false, System.Text.Encoding.UTF8))
+                {
+                    sw.WriteLine("{");
+                    sw.WriteLine("  \"Position\": \"" + config.Position + "\",");
+                    sw.WriteLine("  \"OffsetX\": " + config.OffsetX + ",");
+                    sw.WriteLine("  \"OffsetY\": " + config.OffsetY + ",");
+                    sw.WriteLine("  \"Layout\": \"" + config.Layout + "\",");
+                    sw.WriteLine("  \"FontFamily\": \"" + config.FontFamily + "\",");
+                    sw.WriteLine("  \"FontSize\": " + config.FontSize.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) + ",");
+                    sw.WriteLine("  \"FontBold\": " + config.FontBold.ToString().ToLowerInvariant() + ",");
+                    sw.WriteLine("  \"UploadColor\": \"" + config.UploadColor + "\",");
+                    sw.WriteLine("  \"DownloadColor\": \"" + config.DownloadColor + "\",");
+                    sw.WriteLine("  \"LabelColor\": \"" + config.LabelColor + "\",");
+                    sw.WriteLine("  \"ArrowStyle\": \"" + config.ArrowStyle + "\",");
+                    sw.WriteLine("  \"UnitMode\": \"" + config.UnitMode + "\",");
+                    sw.WriteLine("  \"DecimalPlaces\": " + config.DecimalPlaces + ",");
+                    sw.WriteLine("  \"PaddingX\": " + config.PaddingX + ",");
+                    sw.WriteLine("  \"PaddingY\": " + config.PaddingY + ",");
+                    sw.WriteLine("  \"ItemSpacing\": " + config.ItemSpacing + ",");
+                    sw.WriteLine("  \"ShowHoverHighlight\": " + config.ShowHoverHighlight.ToString().ToLowerInvariant() + ",");
+                    sw.WriteLine("  \"UpdateIntervalMs\": " + config.UpdateIntervalMs + ",");
+                    sw.WriteLine("  \"SelectedAdapterAlias\": \"" + (config.SelectedAdapterAlias ?? "") + "\",");
+                    sw.WriteLine("  \"StartWithWindows\": " + config.StartWithWindows.ToString().ToLowerInvariant() + ",");
+                    sw.WriteLine("  \"LeftClickAction\": \"" + config.LeftClickAction + "\"");
+                    sw.WriteLine("}");
+                }
+
+                UpdateStartupRegistry(config.StartWithWindows);
+            }
+            catch
+            {
+            }
+        }
+
+        public void UpdateStartupRegistry(bool enable)
+        {
+            try
+            {
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(RunKeyPath, true))
+                {
+                    if (key != null)
+                    {
+                        if (enable)
+                        {
+                            string exePath = Application.ExecutablePath;
+                            key.SetValue(AppName, "\"" + exePath + "\"");
+                        }
+                        else
+                        {
+                            if (key.GetValue(AppName) != null)
+                            {
+                                key.DeleteValue(AppName, false);
+                            }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+            }
+        }
+    }
+}

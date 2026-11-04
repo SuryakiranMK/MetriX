@@ -1,0 +1,16 @@
+# Visual Studio / MSBuild
+.vs/
+[Oo]bj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Keep binary executables
+!metriX.exe
+!bin/Release/metriX.exe
+
+# Logs / Temp
+*.log
+*.tmp
+config.json
