@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -14,10 +15,18 @@ namespace MetriX.UI
     {
         private readonly ConfigService _configService;
         private readonly NetworkMonitor _networkMonitor;
+        private readonly SpeedTestService _speedTestService;
 
         public event Action RequestOpenSettings;
 
-        // UI sub-controls
+        // View Tabs
+        private bool _isSpeedTestView = false;
+        private Button _tabBtnMonitor;
+        private Button _tabBtnSpeedTest;
+        private Panel _panelMonitor;
+        private Panel _panelSpeedTest;
+
+        // Live Monitor Controls
         private Panel _graphPanel;
         private Label _lblDownloadStats;
         private Label _lblUploadStats;
@@ -27,16 +36,38 @@ namespace MetriX.UI
         private Button _btn60s;
         private Button _btn5m;
 
-        // Interactive graph state
-        private int _timeframeSeconds = 60; // 30, 60, or 300
+        // Live Monitor State
+        private int _timeframeSeconds = 60;
         private int _hoverMouseX = -1;
         private int _hoverMouseY = -1;
         private bool _isHoveringGraph = false;
+
+        // Speed Test Controls
+        private Panel _gaugePanel;
+        private Button _btnStartSpeedTest;
+        private Label _lblSpeedTestStatus;
+        private Label _lblTestPing;
+        private Label _lblTestDownload;
+        private Label _lblTestUpload;
+        private Label _lblTestHistory;
+
+        // Speed Test Live State
+        private SpeedTestPhase _currentPhase = SpeedTestPhase.Idle;
+        private double _currentGaugeSpeedMbps = 0.0;
+        private double _maxGaugeScale = 100.0; // Dynamic scale (100, 250, 500, 1000)
+        private double _lastResultPing = 0.0;
+        private double _lastResultJitter = 0.0;
+        private double _lastResultDownload = 0.0;
+        private double _lastResultUpload = 0.0;
 
         public FlyoutWindow(ConfigService configService, NetworkMonitor networkMonitor)
         {
             _configService = configService;
             _networkMonitor = networkMonitor;
+            _speedTestService = new SpeedTestService();
+            _speedTestService.ProgressUpdated += OnSpeedTestProgress;
+            _speedTestService.TestCompleted += OnSpeedTestCompleted;
+            _speedTestService.TestFailed += OnSpeedTestFailed;
 
             FormBorderStyle = FormBorderStyle.None;
             ShowInTaskbar = false;
@@ -62,7 +93,6 @@ namespace MetriX.UI
                 CreateParams cp = base.CreateParams;
                 cp.Style = unchecked((int)NativeMethods.WS_POPUP);
                 cp.ExStyle |= NativeMethods.WS_EX_TOPMOST;
-                // Add drop shadow style in Win32
                 const int CS_DROPSHADOW = 0x00020000;
                 cp.ClassStyle |= CS_DROPSHADOW;
                 return cp;
@@ -71,8 +101,8 @@ namespace MetriX.UI
 
         private void InitializeUI()
         {
-            Width = 380;
-            Height = 440;
+            Width = 384;
+            Height = 460;
 
             // Header bar
             var headerPanel = new Panel
@@ -87,18 +117,34 @@ namespace MetriX.UI
                 Text = "metriX",
                 Font = new Font("Segoe UI", 11.0f, FontStyle.Bold),
                 ForeColor = Color.White,
-                Location = new Point(14, 11),
+                Location = new Point(12, 11),
                 AutoSize = true
             };
 
-            var lblSubtitle = new Label
+            // Header View Switcher Tabs
+            _tabBtnMonitor = new Button
             {
-                Text = "LIVE NETWORK MONITOR",
-                Font = new Font("Segoe UI", 7.0f, FontStyle.Bold),
-                ForeColor = Color.FromArgb(76, 194, 255),
-                Location = new Point(78, 14),
-                AutoSize = true
+                Text = "Live Graph",
+                Font = new Font("Segoe UI", 8.0f, FontStyle.Bold),
+                Size = new Size(82, 26),
+                Location = new Point(80, 9),
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
             };
+            _tabBtnMonitor.FlatAppearance.BorderSize = 0;
+            _tabBtnMonitor.Click += (s, e) => SwitchView(false);
+
+            _tabBtnSpeedTest = new Button
+            {
+                Text = "Speed Test",
+                Font = new Font("Segoe UI", 8.0f, FontStyle.Bold),
+                Size = new Size(82, 26),
+                Location = new Point(168, 9),
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
+            };
+            _tabBtnSpeedTest.FlatAppearance.BorderSize = 0;
+            _tabBtnSpeedTest.Click += (s, e) => SwitchView(true);
 
             var btnClose = new Button
             {
@@ -108,7 +154,7 @@ namespace MetriX.UI
                 BackColor = Color.Transparent,
                 FlatStyle = FlatStyle.Flat,
                 Size = new Size(32, 28),
-                Location = new Point(Width - 42, 8),
+                Location = new Point(Width - 38, 8),
                 Cursor = Cursors.Hand
             };
             btnClose.FlatAppearance.BorderSize = 0;
@@ -116,115 +162,36 @@ namespace MetriX.UI
             btnClose.Click += (s, e) => Hide();
 
             headerPanel.Controls.Add(lblTitle);
-            headerPanel.Controls.Add(lblSubtitle);
+            headerPanel.Controls.Add(_tabBtnMonitor);
+            headerPanel.Controls.Add(_tabBtnSpeedTest);
             headerPanel.Controls.Add(btnClose);
             Controls.Add(headerPanel);
 
-            // Timeframe selection buttons
-            int btnY = 52;
-            _btn30s = CreateTimeframeButton("30s", 30, 14, btnY);
-            _btn60s = CreateTimeframeButton("60s", 60, 66, btnY);
-            _btn5m = CreateTimeframeButton("5m", 300, 118, btnY);
-            UpdateTimeframeButtons();
+            // Container 1: Live Monitor View
+            _panelMonitor = new Panel
+            {
+                Location = new Point(0, 44),
+                Size = new Size(Width, 366),
+                BackColor = Color.FromArgb(28, 28, 30)
+            };
+            BuildMonitorView(_panelMonitor);
+            Controls.Add(_panelMonitor);
 
-            Controls.Add(_btn30s);
-            Controls.Add(_btn60s);
-            Controls.Add(_btn5m);
+            // Container 2: Speed Test View
+            _panelSpeedTest = new Panel
+            {
+                Location = new Point(0, 44),
+                Size = new Size(Width, 366),
+                BackColor = Color.FromArgb(28, 28, 30),
+                Visible = false
+            };
+            BuildSpeedTestView(_panelSpeedTest);
+            Controls.Add(_panelSpeedTest);
 
-            // Live rate indicators right of timeframe buttons
-            _lblDownloadStats = new Label
-            {
-                Text = "▼ 0.0 KB/s",
-                Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
-                ForeColor = Color.FromArgb(76, 194, 255),
-                Location = new Point(175, btnY + 4),
-                AutoSize = true
-            };
-            _lblUploadStats = new Label
-            {
-                Text = "▲ 0.0 KB/s",
-                Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
-                ForeColor = Color.FromArgb(108, 203, 95),
-                Location = new Point(275, btnY + 4),
-                AutoSize = true
-            };
-            Controls.Add(_lblDownloadStats);
-            Controls.Add(_lblUploadStats);
+            UpdateViewTabs();
 
-            // Interactive Graph Canvas
-            _graphPanel = new Panel
-            {
-                Location = new Point(14, 82),
-                Size = new Size(352, 175),
-                BackColor = Color.FromArgb(20, 20, 22)
-            };
-            _graphPanel.Paint += OnGraphPaint;
-            _graphPanel.MouseMove += (s, e) =>
-            {
-                _hoverMouseX = e.X;
-                _hoverMouseY = e.Y;
-                _isHoveringGraph = true;
-                _graphPanel.Invalidate();
-            };
-            _graphPanel.MouseLeave += (s, e) =>
-            {
-                _isHoveringGraph = false;
-                _hoverMouseX = -1;
-                _hoverMouseY = -1;
-                _graphPanel.Invalidate();
-            };
-            Controls.Add(_graphPanel);
-
-            // Session Stats Card
-            int cardY = 265;
-            var cardSession = new Panel
-            {
-                Location = new Point(14, cardY),
-                Size = new Size(352, 115),
-                BackColor = Color.FromArgb(34, 34, 38)
-            };
-            cardSession.Paint += (s, e) =>
-            {
-                using (var pen = new Pen(Color.FromArgb(50, 50, 54), 1))
-                {
-                    e.Graphics.DrawRectangle(pen, 0, 0, cardSession.Width - 1, cardSession.Height - 1);
-                }
-            };
-
-            var lblCardTitle = new Label
-            {
-                Text = "ACTIVE CONNECTION & SESSION",
-                Font = new Font("Segoe UI", 7.5f, FontStyle.Bold),
-                ForeColor = Color.FromArgb(160, 160, 160),
-                Location = new Point(12, 10),
-                AutoSize = true
-            };
-
-            _lblAdapterInfo = new Label
-            {
-                Text = "Adapter: Detecting...",
-                Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
-                ForeColor = Color.White,
-                Location = new Point(12, 30),
-                Size = new Size(328, 36)
-            };
-
-            _lblSessionTotals = new Label
-            {
-                Text = "Session Data: 0 B Total",
-                Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
-                ForeColor = Color.FromArgb(210, 210, 210),
-                Location = new Point(12, 70),
-                Size = new Size(328, 36)
-            };
-
-            cardSession.Controls.Add(lblCardTitle);
-            cardSession.Controls.Add(_lblAdapterInfo);
-            cardSession.Controls.Add(_lblSessionTotals);
-            Controls.Add(cardSession);
-
-            // Footer action bar
-            int footY = 388;
+            // Footer action bar (common to both views)
+            int footY = 415;
             var btnSettings = new Button
             {
                 Text = "⚙ Settings",
@@ -250,7 +217,7 @@ namespace MetriX.UI
                 ForeColor = Color.White,
                 BackColor = Color.FromArgb(42, 42, 46),
                 FlatStyle = FlatStyle.Flat,
-                Size = new Size(125, 32),
+                Size = new Size(130, 32),
                 Location = new Point(122, footY),
                 Cursor = Cursors.Hand
             };
@@ -272,7 +239,7 @@ namespace MetriX.UI
                 BackColor = Color.FromArgb(42, 42, 46),
                 FlatStyle = FlatStyle.Flat,
                 Size = new Size(95, 32),
-                Location = new Point(255, footY),
+                Location = new Point(260, footY),
                 Cursor = Cursors.Hand
             };
             btnReset.FlatAppearance.BorderColor = Color.FromArgb(60, 60, 64);
@@ -285,6 +252,483 @@ namespace MetriX.UI
             Controls.Add(btnSettings);
             Controls.Add(btnTaskMgr);
             Controls.Add(btnReset);
+        }
+
+        private void SwitchView(bool speedTest)
+        {
+            _isSpeedTestView = speedTest;
+            _panelMonitor.Visible = !_isSpeedTestView;
+            _panelSpeedTest.Visible = _isSpeedTestView;
+            UpdateViewTabs();
+
+            if (_isSpeedTestView)
+            {
+                RefreshHistoryDisplay();
+            }
+        }
+
+        private void UpdateViewTabs()
+        {
+            if (!_isSpeedTestView)
+            {
+                _tabBtnMonitor.BackColor = Color.FromArgb(0, 120, 215);
+                _tabBtnMonitor.ForeColor = Color.White;
+                _tabBtnSpeedTest.BackColor = Color.Transparent;
+                _tabBtnSpeedTest.ForeColor = Color.FromArgb(170, 170, 175);
+            }
+            else
+            {
+                _tabBtnSpeedTest.BackColor = Color.FromArgb(0, 120, 215);
+                _tabBtnSpeedTest.ForeColor = Color.White;
+                _tabBtnMonitor.BackColor = Color.Transparent;
+                _tabBtnMonitor.ForeColor = Color.FromArgb(170, 170, 175);
+            }
+        }
+
+        private void BuildMonitorView(Panel container)
+        {
+            // Timeframe selection buttons
+            int btnY = 8;
+            _btn30s = CreateTimeframeButton("30s", 30, 14, btnY);
+            _btn60s = CreateTimeframeButton("60s", 60, 66, btnY);
+            _btn5m = CreateTimeframeButton("5m", 300, 118, btnY);
+            UpdateTimeframeButtons();
+
+            container.Controls.Add(_btn30s);
+            container.Controls.Add(_btn60s);
+            container.Controls.Add(_btn5m);
+
+            // Live rate indicators right of timeframe buttons
+            _lblDownloadStats = new Label
+            {
+                Text = "▼ 0.0 KB/s",
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(76, 194, 255),
+                Location = new Point(175, btnY + 4),
+                AutoSize = true
+            };
+            _lblUploadStats = new Label
+            {
+                Text = "▲ 0.0 KB/s",
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(108, 203, 95),
+                Location = new Point(275, btnY + 4),
+                AutoSize = true
+            };
+            container.Controls.Add(_lblDownloadStats);
+            container.Controls.Add(_lblUploadStats);
+
+            // Interactive Graph Canvas
+            _graphPanel = new Panel
+            {
+                Location = new Point(14, 38),
+                Size = new Size(356, 185),
+                BackColor = Color.FromArgb(20, 20, 22)
+            };
+            _graphPanel.Paint += OnGraphPaint;
+            _graphPanel.MouseMove += (s, e) =>
+            {
+                _hoverMouseX = e.X;
+                _hoverMouseY = e.Y;
+                _isHoveringGraph = true;
+                _graphPanel.Invalidate();
+            };
+            _graphPanel.MouseLeave += (s, e) =>
+            {
+                _isHoveringGraph = false;
+                _hoverMouseX = -1;
+                _hoverMouseY = -1;
+                _graphPanel.Invalidate();
+            };
+            container.Controls.Add(_graphPanel);
+
+            // Session Stats Card
+            int cardY = 232;
+            var cardSession = new Panel
+            {
+                Location = new Point(14, cardY),
+                Size = new Size(356, 125),
+                BackColor = Color.FromArgb(34, 34, 38)
+            };
+            cardSession.Paint += (s, e) =>
+            {
+                using (var pen = new Pen(Color.FromArgb(50, 50, 54), 1))
+                {
+                    e.Graphics.DrawRectangle(pen, 0, 0, cardSession.Width - 1, cardSession.Height - 1);
+                }
+            };
+
+            var lblCardTitle = new Label
+            {
+                Text = "ACTIVE CONNECTION & SESSION TELEMETRY",
+                Font = new Font("Segoe UI", 7.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(160, 160, 160),
+                Location = new Point(12, 10),
+                AutoSize = true
+            };
+
+            _lblAdapterInfo = new Label
+            {
+                Text = "Adapter: Detecting...",
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
+                ForeColor = Color.White,
+                Location = new Point(12, 32),
+                Size = new Size(330, 42)
+            };
+
+            _lblSessionTotals = new Label
+            {
+                Text = "Session Data: 0 B Total",
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
+                ForeColor = Color.FromArgb(210, 210, 210),
+                Location = new Point(12, 78),
+                Size = new Size(330, 40)
+            };
+
+            cardSession.Controls.Add(lblCardTitle);
+            cardSession.Controls.Add(_lblAdapterInfo);
+            cardSession.Controls.Add(_lblSessionTotals);
+            container.Controls.Add(cardSession);
+        }
+
+        private void BuildSpeedTestView(Panel container)
+        {
+            // Speedometer Gauge Arc Canvas
+            _gaugePanel = new Panel
+            {
+                Location = new Point(14, 8),
+                Size = new Size(356, 175),
+                BackColor = Color.FromArgb(20, 20, 22)
+            };
+            _gaugePanel.Paint += OnGaugePaint;
+            container.Controls.Add(_gaugePanel);
+
+            // Status message label
+            _lblSpeedTestStatus = new Label
+            {
+                Text = "Ready to benchmark your network",
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
+                ForeColor = Color.FromArgb(180, 180, 180),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(14, 188),
+                Size = new Size(356, 20)
+            };
+            container.Controls.Add(_lblSpeedTestStatus);
+
+            // 3 Metrics Badges Card
+            var cardMetrics = new Panel
+            {
+                Location = new Point(14, 212),
+                Size = new Size(356, 56),
+                BackColor = Color.FromArgb(34, 34, 38)
+            };
+            cardMetrics.Paint += (s, e) =>
+            {
+                using (var pen = new Pen(Color.FromArgb(50, 50, 54), 1))
+                {
+                    e.Graphics.DrawRectangle(pen, 0, 0, cardMetrics.Width - 1, cardMetrics.Height - 1);
+                }
+            };
+
+            _lblTestPing = new Label
+            {
+                Text = "PING\n-- ms",
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(220, 220, 220),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(10, 8),
+                Size = new Size(100, 40)
+            };
+
+            _lblTestDownload = new Label
+            {
+                Text = "DOWNLOAD\n-- Mbps",
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(76, 194, 255),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(125, 8),
+                Size = new Size(110, 40)
+            };
+
+            _lblTestUpload = new Label
+            {
+                Text = "UPLOAD\n-- Mbps",
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(108, 203, 95),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(245, 8),
+                Size = new Size(100, 40)
+            };
+
+            cardMetrics.Controls.Add(_lblTestPing);
+            cardMetrics.Controls.Add(_lblTestDownload);
+            cardMetrics.Controls.Add(_lblTestUpload);
+            container.Controls.Add(cardMetrics);
+
+            // Start / Cancel Test Button
+            _btnStartSpeedTest = new Button
+            {
+                Text = "⚡  START SPEED TEST",
+                Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(0, 120, 215),
+                FlatStyle = FlatStyle.Flat,
+                Size = new Size(356, 36),
+                Location = new Point(14, 276),
+                Cursor = Cursors.Hand
+            };
+            _btnStartSpeedTest.FlatAppearance.BorderSize = 0;
+            _btnStartSpeedTest.Click += OnStartOrCancelSpeedTest;
+            container.Controls.Add(_btnStartSpeedTest);
+
+            // Recent Benchmark History List
+            _lblTestHistory = new Label
+            {
+                Text = "Recent tests will appear here.",
+                Font = new Font("Segoe UI", 7.5f, FontStyle.Regular),
+                ForeColor = Color.FromArgb(150, 150, 155),
+                TextAlign = ContentAlignment.MiddleLeft,
+                Location = new Point(16, 318),
+                Size = new Size(352, 42)
+            };
+            container.Controls.Add(_lblTestHistory);
+        }
+
+        private void OnStartOrCancelSpeedTest(object sender, EventArgs e)
+        {
+            if (_speedTestService.IsRunning)
+            {
+                _speedTestService.CancelTest();
+                _btnStartSpeedTest.Text = "⚡  START SPEED TEST";
+                _btnStartSpeedTest.BackColor = Color.FromArgb(0, 120, 215);
+                _lblSpeedTestStatus.Text = "Test cancelled.";
+            }
+            else
+            {
+                _btnStartSpeedTest.Text = "✕  CANCEL TEST";
+                _btnStartSpeedTest.BackColor = Color.FromArgb(190, 45, 45);
+                _currentGaugeSpeedMbps = 0;
+                _currentPhase = SpeedTestPhase.Ping;
+                _lblTestPing.Text = "PING\n-- ms";
+                _lblTestDownload.Text = "DOWNLOAD\n-- Mbps";
+                _lblTestUpload.Text = "UPLOAD\n-- Mbps";
+                _lblSpeedTestStatus.Text = "Connecting to CDN test node...";
+                _gaugePanel.Invalidate();
+
+                _speedTestService.StartTest();
+            }
+        }
+
+        private void OnSpeedTestProgress(SpeedTestPhase phase, double speedVal, string statusMsg)
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action<SpeedTestPhase, double, string>(OnSpeedTestProgress), phase, speedVal, statusMsg);
+                return;
+            }
+
+            _currentPhase = phase;
+            _lblSpeedTestStatus.Text = statusMsg;
+
+            if (phase == SpeedTestPhase.Download || phase == SpeedTestPhase.Upload)
+            {
+                _currentGaugeSpeedMbps = speedVal;
+                // Dynamically adjust scale
+                if (_currentGaugeSpeedMbps > _maxGaugeScale * 0.9)
+                {
+                    if (_maxGaugeScale <= 100.0) _maxGaugeScale = 250.0;
+                    else if (_maxGaugeScale <= 250.0) _maxGaugeScale = 500.0;
+                    else if (_maxGaugeScale <= 500.0) _maxGaugeScale = 1000.0;
+                }
+
+                if (phase == SpeedTestPhase.Download)
+                {
+                    _lblTestDownload.Text = string.Format("DOWNLOAD\n{0:F1} Mbps", speedVal);
+                }
+                else
+                {
+                    _lblTestUpload.Text = string.Format("UPLOAD\n{0:F1} Mbps", speedVal);
+                }
+            }
+            else if (phase == SpeedTestPhase.Ping)
+            {
+                _lblTestPing.Text = string.Format("PING\n{0:F0} ms", speedVal);
+            }
+
+            _gaugePanel.Invalidate();
+        }
+
+        private void OnSpeedTestCompleted(SpeedTestResult res)
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action<SpeedTestResult>(OnSpeedTestCompleted), res);
+                return;
+            }
+
+            _currentPhase = SpeedTestPhase.Completed;
+            _lastResultPing = res.PingMs;
+            _lastResultJitter = res.JitterMs;
+            _lastResultDownload = res.DownloadMbps;
+            _lastResultUpload = res.UploadMbps;
+
+            _lblTestPing.Text = string.Format("PING\n{0:F0} ms", res.PingMs);
+            _lblTestDownload.Text = string.Format("DOWNLOAD\n{0:F1} Mbps", res.DownloadMbps);
+            _lblTestUpload.Text = string.Format("UPLOAD\n{0:F1} Mbps", res.UploadMbps);
+
+            _btnStartSpeedTest.Text = "⚡  TEST AGAIN";
+            _btnStartSpeedTest.BackColor = Color.FromArgb(0, 120, 215);
+            _lblSpeedTestStatus.Text = string.Format("Benchmark completed at {0:HH:mm:ss}!", res.Timestamp);
+
+            _gaugePanel.Invalidate();
+            RefreshHistoryDisplay();
+        }
+
+        private void OnSpeedTestFailed(string error)
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action<string>(OnSpeedTestFailed), error);
+                return;
+            }
+
+            _currentPhase = SpeedTestPhase.Failed;
+            _btnStartSpeedTest.Text = "⚡  START SPEED TEST";
+            _btnStartSpeedTest.BackColor = Color.FromArgb(0, 120, 215);
+            _lblSpeedTestStatus.Text = "Speed test error: " + error;
+            _gaugePanel.Invalidate();
+        }
+
+        private void RefreshHistoryDisplay()
+        {
+            var history = _speedTestService.LoadHistory();
+            if (history.Count == 0)
+            {
+                _lblTestHistory.Text = "No previous benchmarks recorded yet.";
+                return;
+            }
+
+            var sb = new System.Text.StringBuilder();
+            int toShow = Math.Min(2, history.Count);
+            for (int i = 0; i < toShow; i++)
+            {
+                var h = history[i];
+                sb.AppendFormat("• {0:MM/dd HH:mm}: {1:F1} Mbps ↓  |  {2:F1} Mbps ↑  ({3:F0} ms)",
+                    h.Timestamp, h.DownloadMbps, h.UploadMbps, h.PingMs);
+                if (i < toShow - 1) sb.AppendLine();
+            }
+            _lblTestHistory.Text = sb.ToString();
+        }
+
+        private void OnGaugePaint(object sender, PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
+
+            int w = _gaugePanel.ClientSize.Width;
+            int h = _gaugePanel.ClientSize.Height;
+
+            // Border
+            using (var borderPen = new Pen(Color.FromArgb(45, 45, 50), 1))
+            {
+                g.DrawRectangle(borderPen, 0, 0, w - 1, h - 1);
+            }
+
+            // Draw semi-circle speedometer gauge
+            int gaugeDiameter = 220;
+            int arcX = (w - gaugeDiameter) / 2;
+            int arcY = 22;
+            int penWidth = 14;
+
+            Rectangle arcRect = new Rectangle(arcX, arcY, gaugeDiameter, gaugeDiameter);
+
+            // Background Track Arc (180 to 360 deg)
+            using (var bgPen = new Pen(Color.FromArgb(42, 42, 46), penWidth))
+            {
+                bgPen.StartCap = LineCap.Round;
+                bgPen.EndCap = LineCap.Round;
+                g.DrawArc(bgPen, arcRect, 180, 180);
+            }
+
+            // Active Progress Arc
+            double fraction = Math.Max(0.0, Math.Min(1.0, _currentGaugeSpeedMbps / _maxGaugeScale));
+            float sweepAngle = (float)(fraction * 180.0);
+
+            if (sweepAngle > 0.5f)
+            {
+                Color arcColor = _currentPhase == SpeedTestPhase.Upload
+                    ? Color.FromArgb(108, 203, 95)
+                    : Color.FromArgb(76, 194, 255);
+
+                using (var activePen = new Pen(arcColor, penWidth))
+                {
+                    activePen.StartCap = LineCap.Round;
+                    activePen.EndCap = LineCap.Round;
+                    g.DrawArc(activePen, arcRect, 180, sweepAngle);
+                }
+            }
+
+            // Center speed reading & units
+            string speedText = _currentGaugeSpeedMbps.ToString("F1");
+            string unitText = "Mbps";
+            string phaseText = "BENCHMARK";
+
+            if (_currentPhase == SpeedTestPhase.Ping)
+            {
+                speedText = _lastResultPing.ToString("F0");
+                unitText = "ms";
+                phaseText = "MEASURING LATENCY";
+            }
+            else if (_currentPhase == SpeedTestPhase.Download)
+            {
+                phaseText = "TESTING DOWNLOAD";
+            }
+            else if (_currentPhase == SpeedTestPhase.Upload)
+            {
+                phaseText = "TESTING UPLOAD";
+            }
+            else if (_currentPhase == SpeedTestPhase.Completed)
+            {
+                speedText = _lastResultDownload.ToString("F1");
+                unitText = "Mbps";
+                phaseText = "COMPLETE";
+            }
+            else if (_currentPhase == SpeedTestPhase.Idle)
+            {
+                speedText = "0.0";
+                unitText = "Mbps";
+                phaseText = "READY";
+            }
+
+            using (var valFont = new Font("Segoe UI", 26.0f, FontStyle.Bold))
+            using (var unitFont = new Font("Segoe UI", 9.5f, FontStyle.Bold))
+            using (var phaseFont = new Font("Segoe UI", 7.5f, FontStyle.Bold))
+            using (var valBrush = new SolidBrush(Color.White))
+            using (var unitBrush = new SolidBrush(Color.FromArgb(180, 180, 185)))
+            using (var phaseBrush = new SolidBrush(Color.FromArgb(76, 194, 255)))
+            {
+                SizeF valSize = g.MeasureString(speedText, valFont);
+                float valX = (w - valSize.Width) / 2;
+                float valY = arcY + 50;
+                g.DrawString(speedText, valFont, valBrush, valX, valY);
+
+                SizeF unitSize = g.MeasureString(unitText, unitFont);
+                g.DrawString(unitText, unitFont, unitBrush, (w - unitSize.Width) / 2, valY + valSize.Height - 8);
+
+                SizeF phaseSize = g.MeasureString(phaseText, phaseFont);
+                g.DrawString(phaseText, phaseFont, phaseBrush, (w - phaseSize.Width) / 2, valY + valSize.Height + 14);
+            }
+
+            // Scale min / max labels
+            using (var scaleFont = new Font("Segoe UI", 7.5f, FontStyle.Regular))
+            using (var scaleBrush = new SolidBrush(Color.FromArgb(120, 120, 125)))
+            {
+                g.DrawString("0", scaleFont, scaleBrush, arcX - 2, arcY + (gaugeDiameter / 2) + 6);
+                string maxStr = _maxGaugeScale.ToString("F0");
+                SizeF maxSz = g.MeasureString(maxStr, scaleFont);
+                g.DrawString(maxStr, scaleFont, scaleBrush, arcX + gaugeDiameter - maxSz.Width + 2, arcY + (gaugeDiameter / 2) + 6);
+            }
         }
 
         private Button CreateTimeframeButton(string text, int seconds, int x, int y)
@@ -338,8 +782,8 @@ namespace MetriX.UI
             }
 
             float dpi = DpiHelper.GetDpiScale(Handle);
-            int w = DpiHelper.Scale(380, dpi);
-            int h = DpiHelper.Scale(440, dpi);
+            int w = DpiHelper.Scale(384, dpi);
+            int h = DpiHelper.Scale(460, dpi);
             Size = new Size(w, h);
 
             Screen scr = Screen.FromRectangle(meterBounds);
@@ -396,7 +840,10 @@ namespace MetriX.UI
             _lblSessionTotals.Text = string.Format("Downloaded: {0}  |  Uploaded: {1}\nSession Duration: {2}",
                 FormatBytes(dlBytes), FormatBytes(ulBytes), timeStr);
 
-            _graphPanel.Invalidate();
+            if (_panelMonitor.Visible)
+            {
+                _graphPanel.Invalidate();
+            }
         }
 
         private static string FormatLinkSpeed(ulong bps)
@@ -603,7 +1050,7 @@ namespace MetriX.UI
         {
             base.OnPaint(e);
 
-            // Subtle outer border
+            // Outer border
             using (var pen = new Pen(Color.FromArgb(60, 60, 65), 1))
             {
                 e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
@@ -613,8 +1060,11 @@ namespace MetriX.UI
         protected override void OnDeactivate(EventArgs e)
         {
             base.OnDeactivate(e);
-            // Light-dismiss: auto-close on clicking outside
-            Hide();
+            // Auto close on outside click unless speed test is actively executing
+            if (!_speedTestService.IsRunning)
+            {
+                Hide();
+            }
         }
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
