@@ -10,6 +10,12 @@
 !metriX.exe
 !bin/Release/metriX.exe
 
+# Release artifacts
+dist/
+*.zip
+SHA256SUMS.txt
+release_notes.md
+
 # Logs / Temp
 *.log
 *.tmp
