@@ -16,6 +16,7 @@ namespace MetriX.UI
         private readonly ConfigService _configService;
         private readonly NetworkMonitor _networkMonitor;
         private readonly TaskbarTracker _taskbarTracker;
+        private readonly IntPtr _secondaryTaskbarHandle;
 
         private uint _msgTaskbarCreated;
         private bool _isHovered;
@@ -28,11 +29,19 @@ namespace MetriX.UI
         public event Action RequestToggleFlyout;
         public event Action RequestExit;
 
+        public IntPtr SecondaryTaskbarHandle { get { return _secondaryTaskbarHandle; } }
+
         public OverlayWindow(ConfigService configService, NetworkMonitor networkMonitor, TaskbarTracker taskbarTracker)
+            : this(configService, networkMonitor, taskbarTracker, IntPtr.Zero)
+        {
+        }
+
+        public OverlayWindow(ConfigService configService, NetworkMonitor networkMonitor, TaskbarTracker taskbarTracker, IntPtr secondaryTaskbar)
         {
             _configService = configService;
             _networkMonitor = networkMonitor;
             _taskbarTracker = taskbarTracker;
+            _secondaryTaskbarHandle = secondaryTaskbar;
 
             FormBorderStyle = FormBorderStyle.None;
             ShowInTaskbar = false;
@@ -76,8 +85,11 @@ namespace MetriX.UI
         {
             try
             {
-                if (_taskbarTracker == null || !IsHandleCreated) return;
-                IntPtr hTaskbar = _taskbarTracker.TaskbarHandle;
+                if (!IsHandleCreated) return;
+                IntPtr hTaskbar = _secondaryTaskbarHandle != IntPtr.Zero
+                    ? _secondaryTaskbarHandle
+                    : (_taskbarTracker != null ? _taskbarTracker.TaskbarHandle : IntPtr.Zero);
+
                 if (hTaskbar != IntPtr.Zero)
                 {
                     IntPtr currentOwner = NativeMethods.GetWindowLongPtr(Handle, NativeMethods.GWLP_HWNDPARENT);
@@ -193,7 +205,16 @@ namespace MetriX.UI
             MeasureDimensions(cfg, stats, dpiScale, out width, out height);
 
             // Calculate Taskbar coordinates
-            Rectangle bounds = _taskbarTracker.CalculateBounds(cfg, width, height);
+            Rectangle bounds;
+            if (_secondaryTaskbarHandle != IntPtr.Zero)
+            {
+                bounds = _taskbarTracker.CalculateSecondaryBounds(_secondaryTaskbarHandle, width, height);
+                if (bounds.IsEmpty) return;
+            }
+            else
+            {
+                bounds = _taskbarTracker.CalculateBounds(cfg, width, height);
+            }
 
             // Draw to in-memory 32-bit ARGB DIB Section
             DrawLayeredFrame(bounds, width, height, cfg, stats, dpiScale);

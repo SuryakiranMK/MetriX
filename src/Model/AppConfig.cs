@@ -74,6 +74,7 @@ namespace MetriX.Model
         public string SelectedAdapterAlias { get; set; }
         public bool StartWithWindows { get; set; }
         public LeftClickAction LeftClickAction { get; set; }
+        public bool ShowOnAllMonitors { get; set; }
 
         public AppConfig()
         {
@@ -112,6 +113,7 @@ namespace MetriX.Model
             SelectedAdapterAlias = ""; // All active adapters aggregated
             StartWithWindows = false;
             LeftClickAction = LeftClickAction.Flyout;
+            ShowOnAllMonitors = true;
         }
     }
 }

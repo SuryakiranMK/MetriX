@@ -7,7 +7,7 @@
 
 [![Release](https://img.shields.io/github/v/release/SuryakiranMK/MetriX?color=00E5FF)](https://github.com/SuryakiranMK/MetriX/releases)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011-0078D4?logo=windows)](https://github.com/SuryakiranMK/MetriX)
-[![Binary Size](https://img.shields.io/badge/Binary%20Size-~81%20KB-success)](#performance)
+[![Binary Size](https://img.shields.io/badge/Binary%20Size-~123%20KB-success)](#performance)
 [![CPU Usage](https://img.shields.io/badge/CPU%20Usage-%3C%200.01%25-brightgreen)](#performance)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -31,9 +31,14 @@ It blends naturally into the Windows 11 shell with **true 32-bit alpha transpare
 ## ✨ Features
 
 - **⚡ Zero-Impact Performance**: Uses OS kernel table queries (`GetIfTable2` from `iphlpapi.dll`). Takes only ~1.5 µs per query and sleeps 99.998% of the time.
+- **🖥️ Multi-Monitor Taskbar Mirroring**: Automatically detects all connected displays and secondary taskbars (`Shell_SecondaryTrayWnd`), rendering synchronized, DPI-aware indicators across every monitor.
+- **🔍 Per-App Bandwidth Attribution**: Live tracking of top bandwidth-consuming processes (e.g. Chrome, Discord, Steam) via Win32 IP Helper connection tables, displayed right inside the flyout popup.
+- **📈 Interactive Network Usage Graph**: Taskbar-anchored flyout featuring real-time download/upload waveform graphs with interactive time scrubbing, peak markers, and session counters.
+- **⚡ Integrated Speed Test Engine**: Built-in ping/latency jitter measurement and multi-threaded edge CDN chunk streaming benchmark with speedometer gauge and local test history.
 - **🪟 Windows 11 Native Aesthetic**: Rendered with **Segoe UI Variable Text**, subpixel ClearType, and tabular numerals so numbers never jitter or vibrate as speeds change.
 - **🎨 Complete Customization**:
   - **Layout**: Two-Row Stacked (matches Windows 11 clock/language height) or Single-Row Horizontal.
+  - **Multi-Monitor**: Toggle mirroring across all connected displays with one click.
   - **Colors**: Full RGB color picker for Upload, Download, and Label/Unit colors + one-click presets.
   - **Typography**: Custom font family, font size (7pt–20pt), and bold weight.
   - **Geometry**: Custom horizontal/vertical padding and spacing.
@@ -50,7 +55,7 @@ It blends naturally into the Windows 11 shell with **true 32-bit alpha transpare
   - Adapts to DPI scaling changes and multi-monitor setups.
   - Handles sleep/wake without calculation spikes.
   - Filter driver isolation (ignores duplicate Npcap, VPN, or VirtualBox virtual filter adapters).
-- **🚀 Portable & Standalone**: Single standalone executable (~55 KB). No installation, no Python runtime, no Electron bloat.
+- **🚀 Portable & Standalone**: Single standalone executable (~123 KB). Zero external DLLs, no installation, no Python runtime, no Electron bloat.
 
 ---
 

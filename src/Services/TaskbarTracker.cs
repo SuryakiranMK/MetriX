@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 using MetriX.Model;
@@ -11,12 +12,15 @@ namespace MetriX.Services
         private IntPtr _hTaskbar;
         private IntPtr _hTrayNotify;
         private IntPtr _hTaskList;
+        private readonly List<IntPtr> _secondaryTaskbars = new List<IntPtr>();
 
         private NativeMethods.RECT _lastValidTaskbarRect;
         private NativeMethods.RECT _lastValidTrayRect;
         private NativeMethods.RECT _lastValidTaskListRect;
+        private DateTime _lastRefresh = DateTime.MinValue;
 
         public bool IsTaskbarFound { get { return _hTaskbar != IntPtr.Zero; } }
+        public List<IntPtr> SecondaryTaskbars { get { return _secondaryTaskbars; } }
 
         public IntPtr TaskbarHandle
         {
@@ -32,8 +36,17 @@ namespace MetriX.Services
             RefreshHandles();
         }
 
+        public void RefreshHandlesIfNeeded()
+        {
+            if ((DateTime.Now - _lastRefresh).TotalSeconds >= 2.5)
+            {
+                RefreshHandles();
+            }
+        }
+
         public void RefreshHandles()
         {
+            _lastRefresh = DateTime.Now;
             _hTaskbar = NativeMethods.FindWindow("Shell_TrayWnd", null);
             if (_hTaskbar != IntPtr.Zero)
             {
@@ -49,6 +62,25 @@ namespace MetriX.Services
                     }
                 }
             }
+
+            _secondaryTaskbars.Clear();
+            IntPtr hSec = IntPtr.Zero;
+            while ((hSec = NativeMethods.FindWindowEx(IntPtr.Zero, hSec, "Shell_SecondaryTrayWnd", null)) != IntPtr.Zero)
+            {
+                _secondaryTaskbars.Add(hSec);
+            }
+        }
+
+        public Rectangle CalculateSecondaryBounds(IntPtr hSecondaryTaskbar, int widgetWidth, int widgetHeight)
+        {
+            NativeMethods.RECT secRect = new NativeMethods.RECT();
+            if (hSecondaryTaskbar != IntPtr.Zero && NativeMethods.GetWindowRect(hSecondaryTaskbar, out secRect) && secRect.Width > 50)
+            {
+                int targetX = secRect.Right - widgetWidth - 16;
+                int targetY = secRect.Top + (secRect.Height - widgetHeight) / 2;
+                return new Rectangle(targetX, targetY, widgetWidth, widgetHeight);
+            }
+            return Rectangle.Empty;
         }
 
         public Rectangle CalculateBounds(AppConfig config, int widgetWidth, int widgetHeight)

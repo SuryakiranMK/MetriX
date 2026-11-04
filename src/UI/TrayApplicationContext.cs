@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 using MetriX.Model;
@@ -14,6 +15,7 @@ namespace MetriX.UI
 
         private NotifyIcon _notifyIcon;
         private OverlayWindow _overlayWindow;
+        private readonly List<OverlayWindow> _secondaryOverlays = new List<OverlayWindow>();
         private FlyoutWindow _flyoutWindow;
         private Timer _sampleTimer;
         private SettingsForm _settingsForm;
@@ -117,6 +119,79 @@ namespace MetriX.UI
             }
         }
 
+        private void SynchronizeSecondaryOverlays()
+        {
+            try
+            {
+                if (!_configService.Config.ShowOnAllMonitors)
+                {
+                    if (_secondaryOverlays.Count > 0)
+                    {
+                        foreach (var sec in _secondaryOverlays)
+                        {
+                            if (sec != null && !sec.IsDisposed)
+                            {
+                                sec.Close();
+                                sec.Dispose();
+                            }
+                        }
+                        _secondaryOverlays.Clear();
+                    }
+                    return;
+                }
+
+                var currentSecTaskbars = _taskbarTracker.SecondaryTaskbars;
+
+                // Clean up disposed overlays or overlays whose taskbars no longer exist
+                for (int i = _secondaryOverlays.Count - 1; i >= 0; i--)
+                {
+                    var ov = _secondaryOverlays[i];
+                    if (ov.IsDisposed || !currentSecTaskbars.Contains(ov.SecondaryTaskbarHandle))
+                    {
+                        if (!ov.IsDisposed)
+                        {
+                            ov.Close();
+                            ov.Dispose();
+                        }
+                        _secondaryOverlays.RemoveAt(i);
+                    }
+                }
+
+                // Create overlay for any newly discovered secondary taskbars
+                foreach (IntPtr hSec in currentSecTaskbars)
+                {
+                    bool exists = false;
+                    foreach (var ov in _secondaryOverlays)
+                    {
+                        if (ov.SecondaryTaskbarHandle == hSec)
+                        {
+                            exists = true;
+                            break;
+                        }
+                    }
+
+                    if (!exists && hSec != IntPtr.Zero)
+                    {
+                        var secOverlay = new OverlayWindow(_configService, _networkMonitor, _taskbarTracker, hSec);
+                        secOverlay.RequestOpenSettings += ShowSettings;
+                        secOverlay.RequestToggleFlyout += () =>
+                        {
+                            if (_flyoutWindow != null && !_flyoutWindow.IsDisposed)
+                            {
+                                _flyoutWindow.Toggle(secOverlay.Bounds);
+                            }
+                        };
+                        secOverlay.RequestExit += ExitThread;
+                        secOverlay.Show();
+                        _secondaryOverlays.Add(secOverlay);
+                    }
+                }
+            }
+            catch
+            {
+            }
+        }
+
         private void InitializeOverlay()
         {
             _flyoutWindow = new FlyoutWindow(_configService, _networkMonitor);
@@ -133,6 +208,8 @@ namespace MetriX.UI
             };
             _overlayWindow.RequestExit += ExitThread;
             _overlayWindow.Show();
+
+            SynchronizeSecondaryOverlays();
         }
 
         private void InitializeTimer()
@@ -150,8 +227,19 @@ namespace MetriX.UI
         {
             try
             {
+                _taskbarTracker.RefreshHandlesIfNeeded();
+                SynchronizeSecondaryOverlays();
+
                 var stats = _networkMonitor.Sample(_configService.Config);
                 _overlayWindow.RenderFrame();
+
+                foreach (var sec in _secondaryOverlays)
+                {
+                    if (sec != null && !sec.IsDisposed && sec.Visible)
+                    {
+                        sec.RenderFrame();
+                    }
+                }
 
                 if (_flyoutWindow != null && _flyoutWindow.Visible)
                 {
@@ -180,12 +268,21 @@ namespace MetriX.UI
                 {
                     _sampleTimer.Interval = _configService.Config.UpdateIntervalMs;
                     _networkMonitor.ResetBaseline();
+                    SynchronizeSecondaryOverlays();
                     _overlayWindow.RenderFrame();
 
-                if (_flyoutWindow != null && _flyoutWindow.Visible)
-                {
-                    _flyoutWindow.UpdateData();
-                }
+                    foreach (var sec in _secondaryOverlays)
+                    {
+                        if (sec != null && !sec.IsDisposed && sec.Visible)
+                        {
+                            sec.RenderFrame();
+                        }
+                    }
+
+                    if (_flyoutWindow != null && _flyoutWindow.Visible)
+                    {
+                        _flyoutWindow.UpdateData();
+                    }
                 });
                 _settingsForm.Show();
             }
@@ -215,6 +312,16 @@ namespace MetriX.UI
                 _flyoutWindow.Close();
                 _flyoutWindow.Dispose();
             }
+
+            foreach (var sec in _secondaryOverlays)
+            {
+                if (sec != null && !sec.IsDisposed)
+                {
+                    sec.Close();
+                    sec.Dispose();
+                }
+            }
+            _secondaryOverlays.Clear();
 
             if (_overlayWindow != null && !_overlayWindow.IsDisposed)
             {

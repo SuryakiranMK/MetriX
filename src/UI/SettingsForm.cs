@@ -22,6 +22,7 @@ namespace MetriX.UI
         private ComboBox _cbPosition;
         private NumericUpDown _nudOffsetX;
         private NumericUpDown _nudOffsetY;
+        private CheckBox _chkAllMonitors;
 
         private ComboBox _cbLayout;
         private ComboBox _cbFont;
@@ -93,7 +94,8 @@ namespace MetriX.UI
                 UpdateIntervalMs = src.UpdateIntervalMs,
                 SelectedAdapterAlias = src.SelectedAdapterAlias,
                 StartWithWindows = src.StartWithWindows,
-                LeftClickAction = src.LeftClickAction
+                LeftClickAction = src.LeftClickAction,
+                ShowOnAllMonitors = src.ShowOnAllMonitors
             };
         }
 
@@ -243,7 +245,22 @@ namespace MetriX.UI
                 _previewPanel.Invalidate();
             };
             page.Controls.Add(_cbLayout);
-            y += 45;
+            y += 40;
+
+            _chkAllMonitors = new CheckBox
+            {
+                Text = "Mirror indicator on all connected monitors (secondary taskbars)",
+                Left = 20,
+                Top = y,
+                AutoSize = true,
+                ForeColor = Color.FromArgb(230, 230, 230)
+            };
+            _chkAllMonitors.CheckedChanged += (s, e) =>
+            {
+                _workingConfig.ShowOnAllMonitors = _chkAllMonitors.Checked;
+            };
+            page.Controls.Add(_chkAllMonitors);
+            y += 35;
 
             var lblHint = new Label
             {
@@ -510,6 +527,7 @@ namespace MetriX.UI
             _nudOffsetX.Value = _workingConfig.OffsetX;
             _nudOffsetY.Value = _workingConfig.OffsetY;
             _cbLayout.SelectedIndex = (int)_workingConfig.Layout;
+            _chkAllMonitors.Checked = _workingConfig.ShowOnAllMonitors;
 
             int fIdx = _cbFont.FindStringExact(_workingConfig.FontFamily);
             _cbFont.SelectedIndex = fIdx >= 0 ? fIdx : 0;

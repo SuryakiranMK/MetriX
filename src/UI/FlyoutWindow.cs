@@ -16,6 +16,7 @@ namespace MetriX.UI
         private readonly ConfigService _configService;
         private readonly NetworkMonitor _networkMonitor;
         private readonly SpeedTestService _speedTestService;
+        private readonly ProcessNetworkTracker _processTracker;
 
         public event Action RequestOpenSettings;
 
@@ -32,6 +33,7 @@ namespace MetriX.UI
         private Label _lblUploadStats;
         private Label _lblAdapterInfo;
         private Label _lblSessionTotals;
+        private Label _lblTopApps;
         private Button _btn30s;
         private Button _btn60s;
         private Button _btn5m;
@@ -64,6 +66,7 @@ namespace MetriX.UI
         {
             _configService = configService;
             _networkMonitor = networkMonitor;
+            _processTracker = new ProcessNetworkTracker();
             _speedTestService = new SpeedTestService();
             _speedTestService.ProgressUpdated += OnSpeedTestProgress;
             _speedTestService.TestCompleted += OnSpeedTestCompleted;
@@ -102,7 +105,7 @@ namespace MetriX.UI
         private void InitializeUI()
         {
             Width = 384;
-            Height = 460;
+            Height = 495;
 
             // Header bar
             var headerPanel = new Panel
@@ -171,7 +174,7 @@ namespace MetriX.UI
             _panelMonitor = new Panel
             {
                 Location = new Point(0, 44),
-                Size = new Size(Width, 366),
+                Size = new Size(Width, 400),
                 BackColor = Color.FromArgb(28, 28, 30)
             };
             BuildMonitorView(_panelMonitor);
@@ -181,7 +184,7 @@ namespace MetriX.UI
             _panelSpeedTest = new Panel
             {
                 Location = new Point(0, 44),
-                Size = new Size(Width, 366),
+                Size = new Size(Width, 400),
                 BackColor = Color.FromArgb(28, 28, 30),
                 Visible = false
             };
@@ -191,7 +194,7 @@ namespace MetriX.UI
             UpdateViewTabs();
 
             // Footer action bar (common to both views)
-            int footY = 415;
+            int footY = 450;
             var btnSettings = new Button
             {
                 Text = "⚙ Settings",
@@ -343,11 +346,11 @@ namespace MetriX.UI
             container.Controls.Add(_graphPanel);
 
             // Session Stats Card
-            int cardY = 232;
+            int cardY = 230;
             var cardSession = new Panel
             {
                 Location = new Point(14, cardY),
-                Size = new Size(356, 125),
+                Size = new Size(356, 162),
                 BackColor = Color.FromArgb(34, 34, 38)
             };
             cardSession.Paint += (s, e) =>
@@ -372,8 +375,8 @@ namespace MetriX.UI
                 Text = "Adapter: Detecting...",
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
                 ForeColor = Color.White,
-                Location = new Point(12, 32),
-                Size = new Size(330, 42)
+                Location = new Point(12, 30),
+                Size = new Size(330, 34)
             };
 
             _lblSessionTotals = new Label
@@ -381,13 +384,23 @@ namespace MetriX.UI
                 Text = "Session Data: 0 B Total",
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(210, 210, 210),
-                Location = new Point(12, 78),
-                Size = new Size(330, 40)
+                Location = new Point(12, 66),
+                Size = new Size(330, 32)
+            };
+
+            _lblTopApps = new Label
+            {
+                Text = "Top Network Apps:\nDetecting...",
+                Font = new Font("Segoe UI", 8.0f, FontStyle.Regular),
+                ForeColor = Color.FromArgb(170, 210, 255),
+                Location = new Point(12, 102),
+                Size = new Size(330, 48)
             };
 
             cardSession.Controls.Add(lblCardTitle);
             cardSession.Controls.Add(_lblAdapterInfo);
             cardSession.Controls.Add(_lblSessionTotals);
+            cardSession.Controls.Add(_lblTopApps);
             container.Controls.Add(cardSession);
         }
 
@@ -488,8 +501,8 @@ namespace MetriX.UI
                 Font = new Font("Segoe UI", 7.5f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(150, 150, 155),
                 TextAlign = ContentAlignment.MiddleLeft,
-                Location = new Point(16, 318),
-                Size = new Size(352, 42)
+                Location = new Point(16, 322),
+                Size = new Size(352, 68)
             };
             container.Controls.Add(_lblTestHistory);
         }
@@ -609,7 +622,7 @@ namespace MetriX.UI
             }
 
             var sb = new System.Text.StringBuilder();
-            int toShow = Math.Min(2, history.Count);
+            int toShow = Math.Min(3, history.Count);
             for (int i = 0; i < toShow; i++)
             {
                 var h = history[i];
@@ -783,7 +796,7 @@ namespace MetriX.UI
 
             float dpi = DpiHelper.GetDpiScale(Handle);
             int w = DpiHelper.Scale(384, dpi);
-            int h = DpiHelper.Scale(460, dpi);
+            int h = DpiHelper.Scale(495, dpi);
             Size = new Size(w, h);
 
             Screen scr = Screen.FromRectangle(meterBounds);
@@ -839,6 +852,29 @@ namespace MetriX.UI
             string timeStr = string.Format("{0:00}h {1:00}m {2:00}s", (int)duration.TotalHours, duration.Minutes, duration.Seconds);
             _lblSessionTotals.Text = string.Format("Downloaded: {0}  |  Uploaded: {1}\nSession Duration: {2}",
                 FormatBytes(dlBytes), FormatBytes(ulBytes), timeStr);
+
+            // Active network processes attribution
+            try
+            {
+                var topApps = _processTracker.GetTopActiveApps(4);
+                if (topApps != null && topApps.Count > 0)
+                {
+                    var parts = new List<string>();
+                    foreach (var app in topApps)
+                    {
+                        parts.Add(string.Format("{0} ({1})", app.ProcessName, app.ActiveConnections));
+                    }
+                    _lblTopApps.Text = "Top Network Apps:\n" + string.Join(" • ", parts.ToArray());
+                }
+                else
+                {
+                    _lblTopApps.Text = "Top Network Apps:\nNone active";
+                }
+            }
+            catch
+            {
+                _lblTopApps.Text = "Top Network Apps: N/A";
+            }
 
             if (_panelMonitor.Visible)
             {
