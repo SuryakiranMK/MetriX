@@ -7,6 +7,13 @@ using MetriX.Native;
 
 namespace MetriX.Services
 {
+    public class NetworkHistoryPoint
+    {
+        public DateTime Time;
+        public double DownloadBytesPerSec;
+        public double UploadBytesPerSec;
+    }
+
     public class NetworkMonitor
     {
         private long _lastTimestamp;
@@ -14,16 +21,44 @@ namespace MetriX.Services
         private ulong _lastOutBytes;
         private bool _isFirstSample = true;
 
+        private readonly object _historyLock = new object();
+        private readonly List<NetworkHistoryPoint> _history = new List<NetworkHistoryPoint>(300);
+
         public NetworkStats CurrentStats { get; private set; }
+        public ulong SessionDownloadedBytes { get; private set; }
+        public ulong SessionUploadedBytes { get; private set; }
+        public DateTime SessionStartTime { get; private set; }
+
+        public string ActiveAdapterName { get; private set; }
+        public string ActiveAdapterDescription { get; private set; }
+        public ulong ActiveLinkSpeed { get; private set; }
 
         public NetworkMonitor()
         {
             CurrentStats = new NetworkStats();
+            SessionStartTime = DateTime.Now;
+            ActiveAdapterName = "Auto-Detect";
+            ActiveAdapterDescription = "All Network Adapters";
         }
 
         public void ResetBaseline()
         {
             _isFirstSample = true;
+        }
+
+        public void ResetSessionStats()
+        {
+            SessionDownloadedBytes = 0;
+            SessionUploadedBytes = 0;
+            SessionStartTime = DateTime.Now;
+        }
+
+        public NetworkHistoryPoint[] GetHistorySnapshot()
+        {
+            lock (_historyLock)
+            {
+                return _history.ToArray();
+            }
         }
 
         public NetworkStats Sample(AppConfig config)
@@ -75,6 +110,14 @@ namespace MetriX.Services
                             {
                                 currentIn += row.InOctets;
                                 currentOut += row.OutOctets;
+
+                                if (!string.IsNullOrEmpty(row.Alias))
+                                {
+                                    ActiveAdapterName = row.Alias;
+                                    ActiveAdapterDescription = row.Description;
+                                    ulong speed = Math.Max(row.TransmitLinkSpeed, row.ReceiveLinkSpeed);
+                                    if (speed > 0) ActiveLinkSpeed = speed;
+                                }
                             }
                         }
                     }
@@ -127,6 +170,23 @@ namespace MetriX.Services
             CurrentStats.UploadSpeedBytesPerSec = deltaOut / elapsedSeconds;
             CurrentStats.TotalInBytes = currentIn;
             CurrentStats.TotalOutBytes = currentOut;
+
+            SessionDownloadedBytes += deltaIn;
+            SessionUploadedBytes += deltaOut;
+
+            lock (_historyLock)
+            {
+                _history.Add(new NetworkHistoryPoint
+                {
+                    Time = DateTime.Now,
+                    DownloadBytesPerSec = CurrentStats.DownloadSpeedBytesPerSec,
+                    UploadBytesPerSec = CurrentStats.UploadSpeedBytesPerSec
+                });
+                if (_history.Count > 300)
+                {
+                    _history.RemoveAt(0);
+                }
+            }
 
             _lastTimestamp = currentTimestamp;
             _lastInBytes = currentIn;

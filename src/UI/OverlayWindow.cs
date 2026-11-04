@@ -25,6 +25,7 @@ namespace MetriX.UI
         private ContextMenuStrip _contextMenu;
 
         public event Action RequestOpenSettings;
+        public event Action RequestToggleFlyout;
         public event Action RequestExit;
 
         public OverlayWindow(ConfigService configService, NetworkMonitor networkMonitor, TaskbarTracker taskbarTracker)
@@ -61,10 +62,6 @@ namespace MetriX.UI
                 cp.ExStyle |= NativeMethods.WS_EX_TOOLWINDOW;
                 cp.ExStyle |= NativeMethods.WS_EX_NOACTIVATE;
                 cp.ExStyle |= NativeMethods.WS_EX_TOPMOST;
-                if (_taskbarTracker != null && _taskbarTracker.TaskbarHandle != IntPtr.Zero)
-                {
-                    cp.Parent = _taskbarTracker.TaskbarHandle;
-                }
                 return cp;
             }
         }
@@ -574,7 +571,11 @@ namespace MetriX.UI
             else if (e.Button == MouseButtons.Left)
             {
                 var action = _configService.Config.LeftClickAction;
-                if (action == LeftClickAction.TaskManager)
+                if (action == LeftClickAction.Flyout)
+                {
+                    if (RequestToggleFlyout != null) RequestToggleFlyout();
+                }
+                else if (action == LeftClickAction.TaskManager)
                 {
                     LaunchTaskManager();
                 }
@@ -597,10 +598,9 @@ namespace MetriX.UI
                 try
                 {
                     NativeMethods.WINDOWPOS wp = (NativeMethods.WINDOWPOS)Marshal.PtrToStructure(m.LParam, typeof(NativeMethods.WINDOWPOS));
-                    if (wp.hwndInsertAfter != NativeMethods.HWND_TOPMOST)
+                    if ((wp.flags & NativeMethods.SWP_NOZORDER) == 0 && wp.hwndInsertAfter != NativeMethods.HWND_TOPMOST)
                     {
                         wp.hwndInsertAfter = NativeMethods.HWND_TOPMOST;
-                        wp.flags &= ~NativeMethods.SWP_NOZORDER;
                         Marshal.StructureToPtr(wp, m.LParam, false);
                     }
                 }

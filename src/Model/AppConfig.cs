@@ -34,8 +34,8 @@ namespace MetriX.Model
 
     public enum LeftClickAction
     {
-        TaskManager = 0,
-        MiniStats = 1,
+        Flyout = 0,
+        TaskManager = 1,
         None = 2
     }
 
@@ -111,7 +111,7 @@ namespace MetriX.Model
             UpdateIntervalMs = 1000;
             SelectedAdapterAlias = ""; // All active adapters aggregated
             StartWithWindows = false;
-            LeftClickAction = LeftClickAction.TaskManager;
+            LeftClickAction = LeftClickAction.Flyout;
         }
     }
 }

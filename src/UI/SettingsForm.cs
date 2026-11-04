@@ -100,8 +100,8 @@ namespace MetriX.UI
         private void InitializeComponent()
         {
             Text = "metriX Settings & Customization";
-            Width = 540;
-            Height = 680;
+            Width = 560;
+            Height = 695;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
@@ -123,8 +123,8 @@ namespace MetriX.UI
                 Text = "Live Preview (Interactive)",
                 Left = 16,
                 Top = 12,
-                Width = 492,
-                Height = 85,
+                Width = 512,
+                Height = 88,
                 ForeColor = Color.FromArgb(200, 200, 200)
             };
 
@@ -132,8 +132,8 @@ namespace MetriX.UI
             {
                 Left = 12,
                 Top = 22,
-                Width = 468,
-                Height = 48,
+                Width = 488,
+                Height = 52,
                 BackColor = Color.FromArgb(24, 24, 24)
             };
             _previewPanel.Paint += OnPreviewPaint;
@@ -144,9 +144,9 @@ namespace MetriX.UI
             var tabControl = new TabControl
             {
                 Left = 16,
-                Top = 105,
-                Width = 492,
-                Height = 475
+                Top = 108,
+                Width = 512,
+                Height = 480
             };
 
             // 1. Placement Tab
@@ -175,10 +175,10 @@ namespace MetriX.UI
             var btnApply = new Button
             {
                 Text = "Save & Apply",
-                Width = 110,
-                Height = 32,
-                Left = 280,
-                Top = 595,
+                Width = 115,
+                Height = 34,
+                Left = 295,
+                Top = 605,
                 BackColor = Color.FromArgb(0, 120, 215),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat
@@ -188,10 +188,10 @@ namespace MetriX.UI
             var btnCancel = new Button
             {
                 Text = "Cancel",
-                Width = 90,
-                Height = 32,
-                Left = 400,
-                Top = 595,
+                Width = 95,
+                Height = 34,
+                Left = 422,
+                Top = 605,
                 BackColor = Color.FromArgb(48, 48, 48),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat
@@ -478,11 +478,17 @@ namespace MetriX.UI
             y += 45;
 
             AddLabel(page, "Left-Click Action:", 20, y);
-            _cbLeftClickAction = new ComboBox { Left = 160, Top = y - 3, Width = 220, DropDownStyle = ComboBoxStyle.DropDownList };
-            _cbLeftClickAction.Items.AddRange(new object[] { "Open Windows Task Manager", "Do Nothing" });
+            _cbLeftClickAction = new ComboBox { Left = 160, Top = y - 3, Width = 260, DropDownStyle = ComboBoxStyle.DropDownList };
+            _cbLeftClickAction.Items.AddRange(new object[] {
+                "Open Live Flyout Popup (Recommended)",
+                "Open Windows Task Manager",
+                "Do Nothing"
+            });
             _cbLeftClickAction.SelectedIndexChanged += (s, e) =>
             {
-                _workingConfig.LeftClickAction = _cbLeftClickAction.SelectedIndex == 0 ? LeftClickAction.TaskManager : LeftClickAction.None;
+                if (_cbLeftClickAction.SelectedIndex == 0) _workingConfig.LeftClickAction = LeftClickAction.Flyout;
+                else if (_cbLeftClickAction.SelectedIndex == 1) _workingConfig.LeftClickAction = LeftClickAction.TaskManager;
+                else _workingConfig.LeftClickAction = LeftClickAction.None;
             };
             page.Controls.Add(_cbLeftClickAction);
             y += 45;
@@ -547,7 +553,9 @@ namespace MetriX.UI
             else if (_workingConfig.UpdateIntervalMs <= 2500) _cbRefreshInterval.SelectedIndex = 3;
             else _cbRefreshInterval.SelectedIndex = 4;
 
-            _cbLeftClickAction.SelectedIndex = _workingConfig.LeftClickAction == LeftClickAction.TaskManager ? 0 : 1;
+            if (_workingConfig.LeftClickAction == LeftClickAction.Flyout) _cbLeftClickAction.SelectedIndex = 0;
+            else if (_workingConfig.LeftClickAction == LeftClickAction.TaskManager) _cbLeftClickAction.SelectedIndex = 1;
+            else _cbLeftClickAction.SelectedIndex = 2;
             _chkStartWithWindows.Checked = _workingConfig.StartWithWindows;
         }
 

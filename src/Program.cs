@@ -26,6 +26,15 @@ namespace MetriX
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
 
+                Application.ThreadException += (s, e) =>
+                {
+                    try { System.IO.File.WriteAllText("metrix_crash.log", e.Exception.ToString()); } catch { }
+                };
+                AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+                {
+                    try { System.IO.File.WriteAllText("metrix_crash.log", e.ExceptionObject.ToString()); } catch { }
+                };
+
                 try
                 {
                     var configService = new ConfigService();
@@ -37,6 +46,7 @@ namespace MetriX
                 }
                 catch (Exception ex)
                 {
+                    System.IO.File.AppendAllText("debug.log", "Program Main Exception: " + ex + "\n");
                     MessageBox.Show("Error initializing metriX:\n" + ex.Message, "metriX Error",
                         MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }

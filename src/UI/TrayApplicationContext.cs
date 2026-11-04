@@ -14,6 +14,7 @@ namespace MetriX.UI
 
         private NotifyIcon _notifyIcon;
         private OverlayWindow _overlayWindow;
+        private FlyoutWindow _flyoutWindow;
         private Timer _sampleTimer;
         private SettingsForm _settingsForm;
 
@@ -118,8 +119,18 @@ namespace MetriX.UI
 
         private void InitializeOverlay()
         {
+            _flyoutWindow = new FlyoutWindow(_configService, _networkMonitor);
+            _flyoutWindow.RequestOpenSettings += ShowSettings;
+
             _overlayWindow = new OverlayWindow(_configService, _networkMonitor, _taskbarTracker);
             _overlayWindow.RequestOpenSettings += ShowSettings;
+            _overlayWindow.RequestToggleFlyout += () =>
+            {
+                if (_flyoutWindow != null && !_flyoutWindow.IsDisposed)
+                {
+                    _flyoutWindow.Toggle(_overlayWindow.Bounds);
+                }
+            };
             _overlayWindow.RequestExit += ExitThread;
             _overlayWindow.Show();
         }
@@ -141,6 +152,11 @@ namespace MetriX.UI
             {
                 var stats = _networkMonitor.Sample(_configService.Config);
                 _overlayWindow.RenderFrame();
+
+                if (_flyoutWindow != null && _flyoutWindow.Visible)
+                {
+                    _flyoutWindow.UpdateData();
+                }
 
                 if (_notifyIcon != null)
                 {
@@ -165,6 +181,11 @@ namespace MetriX.UI
                     _sampleTimer.Interval = _configService.Config.UpdateIntervalMs;
                     _networkMonitor.ResetBaseline();
                     _overlayWindow.RenderFrame();
+
+                if (_flyoutWindow != null && _flyoutWindow.Visible)
+                {
+                    _flyoutWindow.UpdateData();
+                }
                 });
                 _settingsForm.Show();
             }
@@ -187,6 +208,12 @@ namespace MetriX.UI
             {
                 _notifyIcon.Visible = false;
                 _notifyIcon.Dispose();
+            }
+
+            if (_flyoutWindow != null && !_flyoutWindow.IsDisposed)
+            {
+                _flyoutWindow.Close();
+                _flyoutWindow.Dispose();
             }
 
             if (_overlayWindow != null && !_overlayWindow.IsDisposed)
