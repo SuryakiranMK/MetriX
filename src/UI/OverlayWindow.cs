@@ -244,6 +244,14 @@ namespace MetriX.UI
                     g.InterpolationMode = InterpolationMode.HighQualityBicubic;
                     g.Clear(Color.Transparent);
 
+                    // Fill entire bounds with imperceptible Alpha=1 floor.
+                    // This prevents the cursor from falling through Alpha=0 pixels to Shell_TrayWnd,
+                    // which causes Windows 11 taskbar to fight for focus and flicker/vanish.
+                    using (Brush hitTestBrush = new SolidBrush(Color.FromArgb(1, 0, 0, 0)))
+                    {
+                        g.FillRectangle(hitTestBrush, 0, 0, width, height);
+                    }
+
                     // Hover highlight (Windows 11 subtle rounded pill)
                     if (_isHovered && cfg.ShowHoverHighlight)
                     {
@@ -450,15 +458,21 @@ namespace MetriX.UI
         protected override void OnMouseEnter(EventArgs e)
         {
             base.OnMouseEnter(e);
-            _isHovered = true;
-            RenderFrame();
+            if (!_isHovered)
+            {
+                _isHovered = true;
+                RenderFrame();
+            }
         }
 
         protected override void OnMouseLeave(EventArgs e)
         {
             base.OnMouseLeave(e);
-            _isHovered = false;
-            RenderFrame();
+            if (_isHovered)
+            {
+                _isHovered = false;
+                RenderFrame();
+            }
         }
 
         protected override void OnMouseDown(MouseEventArgs e)
@@ -513,6 +527,15 @@ namespace MetriX.UI
 
         protected override void WndProc(ref Message m)
         {
+            const int WM_MOUSEACTIVATE = 0x0021;
+            const int MA_NOACTIVATE = 3;
+
+            if (m.Msg == WM_MOUSEACTIVATE)
+            {
+                m.Result = (IntPtr)MA_NOACTIVATE;
+                return;
+            }
+
             if (m.Msg == (int)_msgTaskbarCreated)
             {
                 _taskbarTracker.RefreshHandles();
