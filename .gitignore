@@ -21,3 +21,4 @@ release_notes*.md
 *.log
 *.tmp
 config.json
+data_usage.json

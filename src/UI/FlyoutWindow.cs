@@ -41,6 +41,14 @@ namespace MetriX.UI
         private Button _btn60s;
         private Button _btn5m;
 
+        // Historical Data Usage Controls (Net Used Till Now)
+        private Label _lblUsageTodayVal;
+        private Label _lblUsageTodaySub;
+        private Label _lblUsageWeekVal;
+        private Label _lblUsageWeekSub;
+        private Label _lblUsageMonthVal;
+        private Label _lblUsageMonthSub;
+
         // Live Monitor State
         private int _timeframeSeconds = 60;
         private int _hoverMouseX = -1;
@@ -122,14 +130,14 @@ namespace MetriX.UI
 
         private void InitializeUI()
         {
-            Width = 380;
-            Height = 440;
+            Width = 390;
+            Height = 540;
 
             // Header bar
             var headerPanel = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 42,
+                Height = 44,
                 BackColor = Color.FromArgb(32, 32, 36)
             };
 
@@ -138,7 +146,7 @@ namespace MetriX.UI
                 Text = "metriX",
                 Font = new Font("Segoe UI", 11.0f, FontStyle.Bold),
                 ForeColor = Color.White,
-                Location = new Point(12, 10),
+                Location = new Point(12, 11),
                 AutoSize = true,
                 UseMnemonic = false
             };
@@ -146,8 +154,8 @@ namespace MetriX.UI
             // Segmented View Switcher Pill
             var pnlSegment = new Panel
             {
-                Size = new Size(184, 28),
-                Location = new Point(84, 7),
+                Size = new Size(204, 28),
+                Location = new Point(86, 8),
                 BackColor = Color.FromArgb(24, 24, 28)
             };
             pnlSegment.Paint += (s, e) =>
@@ -162,26 +170,30 @@ namespace MetriX.UI
 
             _tabBtnMonitor = new Button
             {
-                Text = "Live Graph",
+                Text = "📈 Live Graph",
                 Font = new Font("Segoe UI", 8.0f, FontStyle.Bold),
-                Size = new Size(88, 22),
+                Size = new Size(98, 22),
                 Location = new Point(3, 3),
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand,
-                UseMnemonic = false
+                UseMnemonic = false,
+                Padding = new Padding(0),
+                TextAlign = ContentAlignment.MiddleCenter
             };
             _tabBtnMonitor.FlatAppearance.BorderSize = 0;
             _tabBtnMonitor.Click += (s, e) => SwitchView(false);
 
             _tabBtnSpeedTest = new Button
             {
-                Text = "Speed Test",
+                Text = "⚡ Speed Test",
                 Font = new Font("Segoe UI", 8.0f, FontStyle.Bold),
-                Size = new Size(88, 22),
-                Location = new Point(93, 3),
+                Size = new Size(98, 22),
+                Location = new Point(103, 3),
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand,
-                UseMnemonic = false
+                UseMnemonic = false,
+                Padding = new Padding(0),
+                TextAlign = ContentAlignment.MiddleCenter
             };
             _tabBtnSpeedTest.FlatAppearance.BorderSize = 0;
             _tabBtnSpeedTest.Click += (s, e) => SwitchView(true);
@@ -197,7 +209,7 @@ namespace MetriX.UI
                 BackColor = Color.Transparent,
                 FlatStyle = FlatStyle.Flat,
                 Size = new Size(28, 28),
-                Location = new Point(Width - 36, 7),
+                Location = new Point(Width - 36, 8),
                 Cursor = Cursors.Hand,
                 UseMnemonic = false
             };
@@ -213,8 +225,8 @@ namespace MetriX.UI
             // Container 1: Live Monitor View
             _panelMonitor = new Panel
             {
-                Location = new Point(0, 42),
-                Size = new Size(Width, 348),
+                Location = new Point(0, 44),
+                Size = new Size(Width, 446),
                 BackColor = Color.FromArgb(28, 28, 30)
             };
             BuildMonitorView(_panelMonitor);
@@ -223,8 +235,8 @@ namespace MetriX.UI
             // Container 2: Speed Test View
             _panelSpeedTest = new Panel
             {
-                Location = new Point(0, 42),
-                Size = new Size(Width, 348),
+                Location = new Point(0, 44),
+                Size = new Size(Width, 446),
                 BackColor = Color.FromArgb(28, 28, 30),
                 Visible = false
             };
@@ -347,6 +359,8 @@ namespace MetriX.UI
 
         private void BuildMonitorView(Panel container)
         {
+            int w = container.Width - 28; // 362px at 390 width
+
             // Timeframe selection buttons
             int btnY = 6;
             _btn30s = CreateTimeframeButton("30s", 30, 14, btnY);
@@ -384,8 +398,9 @@ namespace MetriX.UI
             _graphPanel = new Panel
             {
                 Location = new Point(14, 34),
-                Size = new Size(352, 140),
-                BackColor = Color.FromArgb(20, 20, 22)
+                Size = new Size(w, 134),
+                BackColor = Color.FromArgb(20, 20, 22),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
             _graphPanel.Paint += OnGraphPaint;
             _graphPanel.MouseMove += (s, e) =>
@@ -404,13 +419,124 @@ namespace MetriX.UI
             };
             container.Controls.Add(_graphPanel);
 
-            // Session Stats Card
-            int cardY = 180;
+            // Card 1: Data Used Till Now (Today / This Week / This Month)
+            int usageY = 174;
+            var cardUsage = new Panel
+            {
+                Location = new Point(14, usageY),
+                Size = new Size(w, 76),
+                BackColor = Color.FromArgb(34, 34, 38),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+            cardUsage.Paint += (s, e) =>
+            {
+                using (var pen = new Pen(Color.FromArgb(48, 48, 54), 1))
+                {
+                    e.Graphics.DrawRectangle(pen, 0, 0, cardUsage.Width - 1, cardUsage.Height - 1);
+                }
+                using (var divPen = new Pen(Color.FromArgb(44, 44, 48), 1))
+                {
+                    int colW = cardUsage.Width / 3;
+                    e.Graphics.DrawLine(divPen, colW, 20, colW, cardUsage.Height - 10);
+                    e.Graphics.DrawLine(divPen, colW * 2, 20, colW * 2, cardUsage.Height - 10);
+                }
+            };
+
+            var lblUsageTitle = new Label
+            {
+                Text = "DATA USED TILL NOW",
+                Font = new Font("Segoe UI", 7.0f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(150, 150, 155),
+                Location = new Point(10, 6),
+                AutoSize = true,
+                UseMnemonic = false
+            };
+
+            int colWidth = w / 3;
+
+            // Column 1: Today
+            _lblUsageTodayVal = new Label
+            {
+                Text = "0 B",
+                Font = new Font("Segoe UI", 10.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(76, 194, 255),
+                Location = new Point(10, 22),
+                Size = new Size(colWidth - 16, 22),
+                TextAlign = ContentAlignment.MiddleLeft,
+                UseMnemonic = false
+            };
+            _lblUsageTodaySub = new Label
+            {
+                Text = "📅 Today",
+                Font = new Font("Segoe UI", 7.5f, FontStyle.Regular),
+                ForeColor = Color.FromArgb(170, 170, 175),
+                Location = new Point(10, 46),
+                Size = new Size(colWidth - 16, 18),
+                TextAlign = ContentAlignment.MiddleLeft,
+                UseMnemonic = false
+            };
+
+            // Column 2: This Week
+            _lblUsageWeekVal = new Label
+            {
+                Text = "0 B",
+                Font = new Font("Segoe UI", 10.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(108, 203, 95),
+                Location = new Point(colWidth + 8, 22),
+                Size = new Size(colWidth - 16, 22),
+                TextAlign = ContentAlignment.MiddleLeft,
+                UseMnemonic = false
+            };
+            _lblUsageWeekSub = new Label
+            {
+                Text = "📆 This Week",
+                Font = new Font("Segoe UI", 7.5f, FontStyle.Regular),
+                ForeColor = Color.FromArgb(170, 170, 175),
+                Location = new Point(colWidth + 8, 46),
+                Size = new Size(colWidth - 16, 18),
+                TextAlign = ContentAlignment.MiddleLeft,
+                UseMnemonic = false
+            };
+
+            // Column 3: This Month
+            _lblUsageMonthVal = new Label
+            {
+                Text = "0 B",
+                Font = new Font("Segoe UI", 10.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(255, 180, 60),
+                Location = new Point((colWidth * 2) + 8, 22),
+                Size = new Size(colWidth - 16, 22),
+                TextAlign = ContentAlignment.MiddleLeft,
+                UseMnemonic = false
+            };
+            _lblUsageMonthSub = new Label
+            {
+                Text = "🗓️ This Month",
+                Font = new Font("Segoe UI", 7.5f, FontStyle.Regular),
+                ForeColor = Color.FromArgb(170, 170, 175),
+                Location = new Point((colWidth * 2) + 8, 46),
+                Size = new Size(colWidth - 16, 18),
+                TextAlign = ContentAlignment.MiddleLeft,
+                UseMnemonic = false
+            };
+
+            cardUsage.Controls.Add(lblUsageTitle);
+            cardUsage.Controls.Add(_lblUsageTodayVal);
+            cardUsage.Controls.Add(_lblUsageTodaySub);
+            cardUsage.Controls.Add(_lblUsageWeekVal);
+            cardUsage.Controls.Add(_lblUsageWeekSub);
+            cardUsage.Controls.Add(_lblUsageMonthVal);
+            cardUsage.Controls.Add(_lblUsageMonthSub);
+            container.Controls.Add(cardUsage);
+
+            // Card 2: Active Connection & Session Telemetry
+            int cardY = 256;
             var cardSession = new Panel
             {
                 Location = new Point(14, cardY),
-                Size = new Size(352, 158),
-                BackColor = Color.FromArgb(34, 34, 38)
+                Size = new Size(w, 180),
+                BackColor = Color.FromArgb(34, 34, 38),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
             cardSession.Paint += (s, e) =>
             {
@@ -436,7 +562,7 @@ namespace MetriX.UI
                 Font = new Font("Segoe UI", 8.0f, FontStyle.Regular),
                 ForeColor = Color.White,
                 Location = new Point(10, 24),
-                Size = new Size(332, 28),
+                Size = new Size(w - 20, 18),
                 UseMnemonic = false
             };
 
@@ -445,8 +571,8 @@ namespace MetriX.UI
                 Text = "Session: ▲ 0 B  |  ▼ 0 B  (00:00:00)",
                 Font = new Font("Segoe UI", 8.0f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(215, 215, 220),
-                Location = new Point(10, 54),
-                Size = new Size(332, 16),
+                Location = new Point(10, 44),
+                Size = new Size(w - 20, 18),
                 UseMnemonic = false
             };
 
@@ -455,16 +581,17 @@ namespace MetriX.UI
                 Text = "Data Quota: Unlimited",
                 Font = new Font("Segoe UI", 7.5f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(100, 200, 255),
-                Location = new Point(10, 72),
-                Size = new Size(332, 16),
+                Location = new Point(10, 64),
+                Size = new Size(w - 20, 18),
                 UseMnemonic = false
             };
 
             _quotaProgressBar = new Panel
             {
-                Location = new Point(10, 90),
-                Size = new Size(332, 5),
-                BackColor = Color.FromArgb(24, 24, 28)
+                Location = new Point(10, 84),
+                Size = new Size(w - 20, 5),
+                BackColor = Color.FromArgb(24, 24, 28),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
             _quotaProgressBar.Paint += (s, e) =>
             {
@@ -498,8 +625,8 @@ namespace MetriX.UI
                 Text = "Top Active Apps:\nDetecting...",
                 Font = new Font("Segoe UI", 7.5f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(170, 210, 255),
-                Location = new Point(10, 100),
-                Size = new Size(332, 50),
+                Location = new Point(10, 94),
+                Size = new Size(w - 20, 76),
                 UseMnemonic = false
             };
 
@@ -514,12 +641,15 @@ namespace MetriX.UI
 
         private void BuildSpeedTestView(Panel container)
         {
+            int w = container.Width - 28;
+
             // Speedometer Gauge Arc Canvas
             _gaugePanel = new Panel
             {
                 Location = new Point(14, 6),
-                Size = new Size(352, 140),
-                BackColor = Color.FromArgb(20, 20, 22)
+                Size = new Size(w, 142),
+                BackColor = Color.FromArgb(20, 20, 22),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
             _gaugePanel.Paint += OnGaugePaint;
             container.Controls.Add(_gaugePanel);
@@ -531,18 +661,20 @@ namespace MetriX.UI
                 Font = new Font("Segoe UI", 8.0f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(180, 180, 180),
                 TextAlign = ContentAlignment.MiddleCenter,
-                Location = new Point(14, 150),
-                Size = new Size(352, 18),
-                UseMnemonic = false
+                Location = new Point(14, 152),
+                Size = new Size(w, 18),
+                UseMnemonic = false,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
             container.Controls.Add(_lblSpeedTestStatus);
 
             // 3 Metrics Badges Card
             var cardMetrics = new Panel
             {
-                Location = new Point(14, 172),
-                Size = new Size(352, 50),
-                BackColor = Color.FromArgb(34, 34, 38)
+                Location = new Point(14, 174),
+                Size = new Size(w, 52),
+                BackColor = Color.FromArgb(34, 34, 38),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
             cardMetrics.Paint += (s, e) =>
             {
@@ -552,14 +684,16 @@ namespace MetriX.UI
                 }
             };
 
+            int badgeW = w / 3;
+
             _lblTestPing = new Label
             {
                 Text = "PING\n-- ms",
                 Font = new Font("Segoe UI", 8.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(220, 220, 220),
                 TextAlign = ContentAlignment.MiddleCenter,
-                Location = new Point(8, 6),
-                Size = new Size(105, 38),
+                Location = new Point(6, 6),
+                Size = new Size(badgeW - 12, 40),
                 UseMnemonic = false
             };
 
@@ -569,8 +703,8 @@ namespace MetriX.UI
                 Font = new Font("Segoe UI", 8.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(76, 194, 255),
                 TextAlign = ContentAlignment.MiddleCenter,
-                Location = new Point(120, 6),
-                Size = new Size(112, 38),
+                Location = new Point(badgeW + 6, 6),
+                Size = new Size(badgeW - 12, 40),
                 UseMnemonic = false
             };
 
@@ -580,8 +714,8 @@ namespace MetriX.UI
                 Font = new Font("Segoe UI", 8.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(108, 203, 95),
                 TextAlign = ContentAlignment.MiddleCenter,
-                Location = new Point(238, 6),
-                Size = new Size(105, 38),
+                Location = new Point((badgeW * 2) + 6, 6),
+                Size = new Size(badgeW - 12, 40),
                 UseMnemonic = false
             };
 
@@ -598,21 +732,23 @@ namespace MetriX.UI
                 ForeColor = Color.White,
                 BackColor = Color.FromArgb(0, 120, 215),
                 FlatStyle = FlatStyle.Flat,
-                Size = new Size(352, 34),
-                Location = new Point(14, 228),
+                Size = new Size(w, 34),
+                Location = new Point(14, 232),
                 Cursor = Cursors.Hand,
-                UseMnemonic = false
+                UseMnemonic = false,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
             _btnStartSpeedTest.FlatAppearance.BorderSize = 0;
             _btnStartSpeedTest.Click += OnStartOrCancelSpeedTest;
             container.Controls.Add(_btnStartSpeedTest);
 
-            // Recent Benchmark History Card
+            // Recent Benchmark History Card - EXPANDED TO FILL VIEWPORT
             var cardHistory = new Panel
             {
-                Location = new Point(14, 268),
-                Size = new Size(352, 70),
-                BackColor = Color.FromArgb(34, 34, 38)
+                Location = new Point(14, 274),
+                Size = new Size(w, 162),
+                BackColor = Color.FromArgb(34, 34, 38),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
             cardHistory.Paint += (s, e) =>
             {
@@ -624,7 +760,7 @@ namespace MetriX.UI
 
             var lblHistTitle = new Label
             {
-                Text = "RECENT SPEED BENCHMARKS",
+                Text = "RECENT SPEED BENCHMARKS & STATS",
                 Font = new Font("Segoe UI", 7.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(150, 150, 155),
                 Location = new Point(10, 6),
@@ -634,12 +770,12 @@ namespace MetriX.UI
 
             _lblTestHistory = new Label
             {
-                Text = "No previous benchmarks recorded yet.\nRun a test to record network throughput.",
-                Font = new Font("Segoe UI", 7.5f, FontStyle.Regular),
+                Text = "No previous benchmarks recorded yet.\nClick 'Start Speed Test' above to measure ping, download, and upload speeds.",
+                Font = new Font("Segoe UI", 8.0f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(160, 160, 165),
-                TextAlign = ContentAlignment.MiddleLeft,
-                Location = new Point(10, 24),
-                Size = new Size(332, 40),
+                TextAlign = ContentAlignment.TopLeft,
+                Location = new Point(10, 26),
+                Size = new Size(w - 20, 128),
                 UseMnemonic = false
             };
 
@@ -937,9 +1073,14 @@ namespace MetriX.UI
             }
 
             float dpi = DpiHelper.GetDpiScale(Handle);
-            int w = DpiHelper.Scale(380, dpi);
-            int h = DpiHelper.Scale(440, dpi);
+            int w = DpiHelper.Scale(390, dpi);
+            int h = DpiHelper.Scale(540, dpi);
             Size = new Size(w, h);
+
+            int contentW = ClientSize.Width;
+            int contentH = ClientSize.Height - 44 - 50;
+            if (_panelMonitor != null) _panelMonitor.Size = new Size(contentW, contentH);
+            if (_panelSpeedTest != null) _panelSpeedTest.Size = new Size(contentW, contentH);
 
             Screen scr = Screen.FromRectangle(meterBounds);
             Rectangle workArea = scr.WorkingArea;
@@ -980,12 +1121,19 @@ namespace MetriX.UI
                 _lblUploadStats.Text = string.Format("▲ {0} {1}", stats.UploadFormatted, stats.UploadUnit);
             }
 
-            // Adapter info (concise, clear 2-line presentation)
+            // Adapter info (concise, clear 1-line presentation)
             string alias = _networkMonitor.ActiveAdapterName;
             string desc = _networkMonitor.ActiveAdapterDescription;
             ulong speedBps = _networkMonitor.ActiveLinkSpeed;
             string speedStr = speedBps > 0 ? FormatLinkSpeed(speedBps) : "Active";
-            _lblAdapterInfo.Text = string.Format("Adapter: {0} ({1})\nLink: {2} • Active Telemetry", alias, desc, speedStr);
+            if (!string.IsNullOrEmpty(desc) && desc != alias)
+            {
+                _lblAdapterInfo.Text = string.Format("Adapter: {0} • Link: {1} ({2})", alias, speedStr, desc);
+            }
+            else
+            {
+                _lblAdapterInfo.Text = string.Format("Adapter: {0} • Link: {1} • Active Telemetry", alias, speedStr);
+            }
 
             // Session data & Quota calculation
             ulong dlBytes = _networkMonitor.SessionDownloadedBytes;
@@ -995,6 +1143,18 @@ namespace MetriX.UI
             string timeStr = string.Format("{0:00}h {1:00}m {2:00}s", (int)duration.TotalHours, duration.Minutes, duration.Seconds);
             _lblSessionTotals.Text = string.Format("Session: ▲ {0}  |  ▼ {1}  ({2})",
                 FormatBytes(ulBytes), FormatBytes(dlBytes), timeStr);
+
+            // Update Historical Data Usage (Net Used Till Now: Today, Week, Month)
+            if (_networkMonitor.UsageTracker != null)
+            {
+                var usage = _networkMonitor.UsageTracker.CurrentRecord;
+                if (usage != null)
+                {
+                    if (_lblUsageTodayVal != null) _lblUsageTodayVal.Text = DataUsageTracker.FormatBytes(usage.TodayTotalBytes);
+                    if (_lblUsageWeekVal != null) _lblUsageWeekVal.Text = DataUsageTracker.FormatBytes(usage.WeekTotalBytes);
+                    if (_lblUsageMonthVal != null) _lblUsageMonthVal.Text = DataUsageTracker.FormatBytes(usage.MonthTotalBytes);
+                }
+            }
 
             double quotaGb = _configService.Config.MonthlyDataQuotaGb;
             if (quotaGb > 0)

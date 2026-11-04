@@ -14,7 +14,7 @@ namespace MetriX.Services
         public double UploadBytesPerSec;
     }
 
-    public class NetworkMonitor
+    public class NetworkMonitor : IDisposable
     {
         private long _lastTimestamp;
         private ulong _lastInBytes;
@@ -32,6 +32,7 @@ namespace MetriX.Services
         public string ActiveAdapterName { get; private set; }
         public string ActiveAdapterDescription { get; private set; }
         public ulong ActiveLinkSpeed { get; private set; }
+        public DataUsageTracker UsageTracker { get; private set; }
 
         public NetworkMonitor()
         {
@@ -39,6 +40,7 @@ namespace MetriX.Services
             SessionStartTime = DateTime.Now;
             ActiveAdapterName = "Auto-Detect";
             ActiveAdapterDescription = "All Network Adapters";
+            UsageTracker = new DataUsageTracker();
         }
 
         public void ResetBaseline()
@@ -173,6 +175,10 @@ namespace MetriX.Services
 
             SessionDownloadedBytes += deltaIn;
             SessionUploadedBytes += deltaOut;
+            if (UsageTracker != null)
+            {
+                UsageTracker.RecordTraffic(deltaIn, deltaOut);
+            }
 
             lock (_historyLock)
             {
@@ -333,6 +339,15 @@ namespace MetriX.Services
             {
                 val = (bitsPerSec / 1000000000.0).ToString(format);
                 unit = "Gbps";
+            }
+        }
+
+        public void Dispose()
+        {
+            if (UsageTracker != null)
+            {
+                UsageTracker.Dispose();
+                UsageTracker = null;
             }
         }
     }
