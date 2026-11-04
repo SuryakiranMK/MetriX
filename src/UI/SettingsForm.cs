@@ -58,16 +58,19 @@ namespace MetriX.UI
         private FluentNumericStepper _stepperIdleOpacity;
 
         // Controls - Page 3: System & Network
+        private readonly UpdateService _updateService;
         private ComboBox _cbAdapter;
         private ComboBox _cbRefreshInterval;
         private ComboBox _cbLeftClickAction;
         private FluentNumericStepper _stepperDataQuota;
         private FluentToggleSwitch _toggleStartWithWindows;
+        private FluentToggleSwitch _toggleSilentUpdate;
 
-        public SettingsForm(ConfigService configService, NetworkMonitor networkMonitor, Action onSettingsUpdated)
+        public SettingsForm(ConfigService configService, NetworkMonitor networkMonitor, UpdateService updateService, Action onSettingsUpdated)
         {
             _configService = configService;
             _networkMonitor = networkMonitor;
+            _updateService = updateService;
             _onSettingsUpdated = onSettingsUpdated;
 
             _workingConfig = CloneConfig(_configService.Config);
@@ -720,6 +723,58 @@ namespace MetriX.UI
             };
             page.Controls.Add(new FluentSettingCard("Start with Windows", "Automatically launch metriX when you log in", _toggleStartWithWindows) { Location = new Point(0, y) });
             y += 68;
+
+            // Card 6: Application Updates
+            var btnCheckUpdates = new Button
+            {
+                Text = "Check for Updates",
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(0, 120, 215),
+                FlatStyle = FlatStyle.Flat,
+                Size = new Size(130, 28),
+                Cursor = Cursors.Hand,
+                UseMnemonic = false
+            };
+            btnCheckUpdates.FlatAppearance.BorderSize = 0;
+
+            var cardUpdates = new FluentSettingCard("Application Updates", "metriX v2.5.0 • Up to date", btnCheckUpdates) { Location = new Point(0, y) };
+            btnCheckUpdates.Click += (s, e) =>
+            {
+                if (_updateService == null) return;
+                btnCheckUpdates.Enabled = false;
+                btnCheckUpdates.Text = "Checking...";
+                _updateService.CheckForUpdatesAsync(info =>
+                {
+                    btnCheckUpdates.Enabled = true;
+                    btnCheckUpdates.Text = "Check for Updates";
+
+                    if (info != null && info.IsUpdateAvailable)
+                    {
+                        var dlg = new UpdateDialog(info, _updateService, _configService);
+                        dlg.ShowDialog(this);
+                    }
+                    else if (info != null && !string.IsNullOrEmpty(info.ErrorMessage))
+                    {
+                        MessageBox.Show(this, "Could not check for updates: " + info.ErrorMessage, "metriX Update", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                    else
+                    {
+                        MessageBox.Show(this, "You are already using the latest version of metriX (v" + UpdateService.GetCurrentAssemblyVersion() + ").", "metriX Up to Date", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                });
+            };
+            page.Controls.Add(cardUpdates);
+            y += 68;
+
+            // Card 7: Silent Auto-Update
+            _toggleSilentUpdate = new FluentToggleSwitch();
+            _toggleSilentUpdate.CheckedChanged += (s, e) =>
+            {
+                _workingConfig.EnableSilentAutoUpdate = _toggleSilentUpdate.Checked;
+            };
+            page.Controls.Add(new FluentSettingCard("Silent Auto-Update", "Automatically download and apply updates without prompting", _toggleSilentUpdate) { Location = new Point(0, y) });
+            y += 68;
         }
 
         private ComboBox CreateStyledComboBox(int width)
@@ -1010,6 +1065,7 @@ namespace MetriX.UI
 
             _stepperDataQuota.Value = (decimal)_workingConfig.MonthlyDataQuotaGb;
             _toggleStartWithWindows.Checked = _workingConfig.StartWithWindows;
+            if (_toggleSilentUpdate != null) _toggleSilentUpdate.Checked = _workingConfig.EnableSilentAutoUpdate;
         }
 
         private void OnPreviewPaint(object sender, PaintEventArgs e)
@@ -1116,6 +1172,10 @@ namespace MetriX.UI
             if (_stepperDataQuota != null)
             {
                 _workingConfig.MonthlyDataQuotaGb = (double)_stepperDataQuota.Value;
+            }
+            if (_toggleSilentUpdate != null)
+            {
+                _workingConfig.EnableSilentAutoUpdate = _toggleSilentUpdate.Checked;
             }
             _configService.Save(_workingConfig);
             if (_onSettingsUpdated != null) _onSettingsUpdated();

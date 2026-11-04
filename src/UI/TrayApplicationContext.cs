@@ -19,12 +19,16 @@ namespace MetriX.UI
         private FlyoutWindow _flyoutWindow;
         private Timer _sampleTimer;
         private SettingsForm _settingsForm;
+        private readonly UpdateService _updateService;
 
         public TrayApplicationContext(ConfigService configService, NetworkMonitor networkMonitor, TaskbarTracker taskbarTracker)
         {
             _configService = configService;
             _networkMonitor = networkMonitor;
             _taskbarTracker = taskbarTracker;
+
+            _updateService = new UpdateService(_configService, _networkMonitor);
+            _updateService.UpdateAvailable += OnUpdateAvailable;
 
             InitializeTray();
             InitializeOverlay();
@@ -54,10 +58,13 @@ namespace MetriX.UI
 
             var itemSettings = new ToolStripMenuItem("⚙  Settings & Customization...", null, (s, e) => ShowSettings());
 
+            var itemCheckUpdate = new ToolStripMenuItem("🔄  Check for Updates...", null, (s, e) => TriggerManualUpdateCheck());
+
             var itemExit = new ToolStripMenuItem("❌  Exit metriX", null, (s, e) => ExitThread());
 
             menu.Items.Add(itemFlyout);
             menu.Items.Add(itemSettings);
+            menu.Items.Add(itemCheckUpdate);
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(itemExit);
 
@@ -191,6 +198,7 @@ namespace MetriX.UI
                             }
                         };
                         secOverlay.RequestExit += ExitThread;
+                        secOverlay.RequestCheckUpdates += TriggerManualUpdateCheck;
                         secOverlay.Show();
                         _secondaryOverlays.Add(secOverlay);
                     }
@@ -215,6 +223,7 @@ namespace MetriX.UI
                     _flyoutWindow.Toggle(_overlayWindow.Bounds);
                 }
             };
+            _overlayWindow.RequestCheckUpdates += TriggerManualUpdateCheck;
             _overlayWindow.RequestExit += ExitThread;
             _overlayWindow.Show();
 
@@ -273,7 +282,7 @@ namespace MetriX.UI
         {
             if (_settingsForm == null || _settingsForm.IsDisposed)
             {
-                _settingsForm = new SettingsForm(_configService, _networkMonitor, () =>
+                _settingsForm = new SettingsForm(_configService, _networkMonitor, _updateService, () =>
                 {
                     _sampleTimer.Interval = _configService.Config.UpdateIntervalMs;
                     _networkMonitor.ResetBaseline();
@@ -302,8 +311,58 @@ namespace MetriX.UI
             }
         }
 
+        private void OnUpdateAvailable(UpdateInfo info)
+        {
+            if (info == null || !info.IsUpdateAvailable) return;
+
+            try
+            {
+                if (_settingsForm != null && !_settingsForm.IsDisposed && _settingsForm.Visible)
+                {
+                    var dlg = new UpdateDialog(info, _updateService, _configService);
+                    dlg.ShowDialog(_settingsForm);
+                }
+                else
+                {
+                    var dlg = new UpdateDialog(info, _updateService, _configService);
+                    dlg.ShowDialog();
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        public void TriggerManualUpdateCheck()
+        {
+            if (_updateService.IsChecking) return;
+
+            _updateService.CheckForUpdatesAsync(info =>
+            {
+                if (info != null && info.IsUpdateAvailable)
+                {
+                    OnUpdateAvailable(info);
+                }
+                else if (info != null && !string.IsNullOrEmpty(info.ErrorMessage))
+                {
+                    MessageBox.Show("Could not check for updates:\n" + info.ErrorMessage, "metriX Update",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+                else
+                {
+                    MessageBox.Show("You are running the latest version of metriX (v" + UpdateService.GetCurrentAssemblyVersion() + ").",
+                        "metriX Up to Date", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            });
+        }
+
         protected override void ExitThreadCore()
         {
+            if (_updateService != null)
+            {
+                _updateService.Dispose();
+            }
+
             if (_sampleTimer != null)
             {
                 _sampleTimer.Stop();

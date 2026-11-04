@@ -138,6 +138,18 @@ namespace MetriX.Services
                             LeftClickAction lca;
                             if (Enum.TryParse(val, true, out lca)) config.LeftClickAction = lca;
                             break;
+                        case "ShowOnAllMonitors":
+                            bool sam; if (bool.TryParse(val, out sam)) config.ShowOnAllMonitors = sam;
+                            break;
+                        case "MonthlyDataQuotaGb":
+                            double mdq; if (double.TryParse(val, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out mdq)) config.MonthlyDataQuotaGb = mdq;
+                            break;
+                        case "EnableAutoUpdateCheck":
+                            bool eau; if (bool.TryParse(val, out eau)) config.EnableAutoUpdateCheck = eau;
+                            break;
+                        case "EnableSilentAutoUpdate":
+                            bool esu; if (bool.TryParse(val, out esu)) config.EnableSilentAutoUpdate = esu;
+                            break;
                     }
                 }
             }
@@ -185,7 +197,11 @@ namespace MetriX.Services
                     sw.WriteLine("  \"UpdateIntervalMs\": " + config.UpdateIntervalMs + ",");
                     sw.WriteLine("  \"SelectedAdapterAlias\": \"" + (config.SelectedAdapterAlias ?? "") + "\",");
                     sw.WriteLine("  \"StartWithWindows\": " + config.StartWithWindows.ToString().ToLowerInvariant() + ",");
-                    sw.WriteLine("  \"LeftClickAction\": \"" + config.LeftClickAction + "\"");
+                    sw.WriteLine("  \"LeftClickAction\": \"" + config.LeftClickAction + "\",");
+                    sw.WriteLine("  \"ShowOnAllMonitors\": " + config.ShowOnAllMonitors.ToString().ToLowerInvariant() + ",");
+                    sw.WriteLine("  \"MonthlyDataQuotaGb\": " + config.MonthlyDataQuotaGb.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) + ",");
+                    sw.WriteLine("  \"EnableAutoUpdateCheck\": " + config.EnableAutoUpdateCheck.ToString().ToLowerInvariant() + ",");
+                    sw.WriteLine("  \"EnableSilentAutoUpdate\": " + config.EnableSilentAutoUpdate.ToString().ToLowerInvariant());
                     sw.WriteLine("}");
                 }
 

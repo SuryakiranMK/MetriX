@@ -76,6 +76,8 @@ namespace MetriX.Model
         public LeftClickAction LeftClickAction { get; set; }
         public bool ShowOnAllMonitors { get; set; }
         public double MonthlyDataQuotaGb { get; set; }
+        public bool EnableAutoUpdateCheck { get; set; }
+        public bool EnableSilentAutoUpdate { get; set; }
 
         public AppConfig()
         {
@@ -116,6 +118,8 @@ namespace MetriX.Model
             LeftClickAction = LeftClickAction.Flyout;
             ShowOnAllMonitors = true;
             MonthlyDataQuotaGb = 0.0;
+            EnableAutoUpdateCheck = true;
+            EnableSilentAutoUpdate = false;
         }
     }
 }

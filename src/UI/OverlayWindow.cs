@@ -27,6 +27,7 @@ namespace MetriX.UI
 
         public event Action RequestOpenSettings;
         public event Action RequestToggleFlyout;
+        public event Action RequestCheckUpdates;
         public event Action RequestExit;
 
         public IntPtr SecondaryTaskbarHandle { get { return _secondaryTaskbarHandle; } }
@@ -118,6 +119,11 @@ namespace MetriX.UI
                 if (RequestOpenSettings != null) RequestOpenSettings();
             });
 
+            var itemUpdates = new ToolStripMenuItem("🔄  Check for Updates...", null, (s, e) =>
+            {
+                if (RequestCheckUpdates != null) RequestCheckUpdates();
+            });
+
             var itemLayout = new ToolStripMenuItem("🔄  Display Layout");
             itemLayout.DropDown.Renderer = new Windows11MenuRenderer();
             var itemStacked = new ToolStripMenuItem("Stacked (2 Rows)", null, (s, e) => ToggleLayout(LayoutMode.Stacked));
@@ -158,6 +164,7 @@ namespace MetriX.UI
 
             _contextMenu.Items.Add(itemFlyout);
             _contextMenu.Items.Add(itemSettings);
+            _contextMenu.Items.Add(itemUpdates);
             _contextMenu.Items.Add(new ToolStripSeparator());
             _contextMenu.Items.Add(itemLayout);
             _contextMenu.Items.Add(itemPosition);
