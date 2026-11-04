@@ -43,11 +43,20 @@ namespace MetriX.UI
             var menu = new ContextMenuStrip();
             menu.Renderer = new Windows11MenuRenderer();
 
+            var itemFlyout = new ToolStripMenuItem("📈  Network Graph & Speed Test...", null, (s, e) =>
+            {
+                if (_flyoutWindow != null && !_flyoutWindow.IsDisposed)
+                {
+                    _flyoutWindow.Toggle(_overlayWindow.Bounds);
+                }
+            });
+            itemFlyout.Font = new Font("Segoe UI", 9.0f, FontStyle.Bold);
+
             var itemSettings = new ToolStripMenuItem("⚙  Settings & Customization...", null, (s, e) => ShowSettings());
-            itemSettings.Font = new Font("Segoe UI", 9.0f, FontStyle.Bold);
 
-            var itemExit = new ToolStripMenuItem("❌  Exit", null, (s, e) => ExitThread());
+            var itemExit = new ToolStripMenuItem("❌  Exit metriX", null, (s, e) => ExitThread());
 
+            menu.Items.Add(itemFlyout);
             menu.Items.Add(itemSettings);
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(itemExit);

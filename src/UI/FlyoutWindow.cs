@@ -33,6 +33,9 @@ namespace MetriX.UI
         private Label _lblUploadStats;
         private Label _lblAdapterInfo;
         private Label _lblSessionTotals;
+        private Label _lblQuotaStats;
+        private Panel _quotaProgressBar;
+        private float _quotaPercent = 0f;
         private Label _lblTopApps;
         private Button _btn30s;
         private Button _btn60s;
@@ -102,10 +105,25 @@ namespace MetriX.UI
             }
         }
 
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            try
+            {
+                int darkMode = 1;
+                NativeMethods.DwmSetWindowAttribute(Handle, NativeMethods.DWMWA_USE_IMMERSIVE_DARK_MODE, ref darkMode, sizeof(int));
+                int cornerPreference = NativeMethods.DWMWCP_ROUND;
+                NativeMethods.DwmSetWindowAttribute(Handle, NativeMethods.DWMWA_WINDOW_CORNER_PREFERENCE, ref cornerPreference, sizeof(int));
+                int backdrop = NativeMethods.DWMSBT_TRANSIENTWINDOW;
+                NativeMethods.DwmSetWindowAttribute(Handle, NativeMethods.DWMWA_SYSTEMBACKDROP_TYPE, ref backdrop, sizeof(int));
+            }
+            catch { }
+        }
+
         private void InitializeUI()
         {
-            Width = 384;
-            Height = 495;
+            Width = 390;
+            Height = 525;
 
             // Header bar
             var headerPanel = new Panel
@@ -174,7 +192,7 @@ namespace MetriX.UI
             _panelMonitor = new Panel
             {
                 Location = new Point(0, 44),
-                Size = new Size(Width, 400),
+                Size = new Size(Width, 428),
                 BackColor = Color.FromArgb(28, 28, 30)
             };
             BuildMonitorView(_panelMonitor);
@@ -184,7 +202,7 @@ namespace MetriX.UI
             _panelSpeedTest = new Panel
             {
                 Location = new Point(0, 44),
-                Size = new Size(Width, 400),
+                Size = new Size(Width, 428),
                 BackColor = Color.FromArgb(28, 28, 30),
                 Visible = false
             };
@@ -194,7 +212,7 @@ namespace MetriX.UI
             UpdateViewTabs();
 
             // Footer action bar (common to both views)
-            int footY = 450;
+            int footY = 478;
             var btnSettings = new Button
             {
                 Text = "⚙ Settings",
@@ -242,7 +260,7 @@ namespace MetriX.UI
                 BackColor = Color.FromArgb(42, 42, 46),
                 FlatStyle = FlatStyle.Flat,
                 Size = new Size(95, 32),
-                Location = new Point(260, footY),
+                Location = new Point(265, footY),
                 Cursor = Cursors.Hand
             };
             btnReset.FlatAppearance.BorderColor = Color.FromArgb(60, 60, 64);
@@ -325,7 +343,7 @@ namespace MetriX.UI
             _graphPanel = new Panel
             {
                 Location = new Point(14, 38),
-                Size = new Size(356, 185),
+                Size = new Size(362, 175),
                 BackColor = Color.FromArgb(20, 20, 22)
             };
             _graphPanel.Paint += OnGraphPaint;
@@ -346,11 +364,11 @@ namespace MetriX.UI
             container.Controls.Add(_graphPanel);
 
             // Session Stats Card
-            int cardY = 230;
+            int cardY = 220;
             var cardSession = new Panel
             {
                 Location = new Point(14, cardY),
-                Size = new Size(356, 162),
+                Size = new Size(362, 198),
                 BackColor = Color.FromArgb(34, 34, 38)
             };
             cardSession.Paint += (s, e) =>
@@ -366,7 +384,7 @@ namespace MetriX.UI
                 Text = "ACTIVE CONNECTION & SESSION TELEMETRY",
                 Font = new Font("Segoe UI", 7.5f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(160, 160, 160),
-                Location = new Point(12, 10),
+                Location = new Point(12, 8),
                 AutoSize = true
             };
 
@@ -375,8 +393,8 @@ namespace MetriX.UI
                 Text = "Adapter: Detecting...",
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
                 ForeColor = Color.White,
-                Location = new Point(12, 30),
-                Size = new Size(330, 34)
+                Location = new Point(12, 26),
+                Size = new Size(338, 28)
             };
 
             _lblSessionTotals = new Label
@@ -384,8 +402,50 @@ namespace MetriX.UI
                 Text = "Session Data: 0 B Total",
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(210, 210, 210),
-                Location = new Point(12, 66),
-                Size = new Size(330, 32)
+                Location = new Point(12, 56),
+                Size = new Size(338, 28)
+            };
+
+            _lblQuotaStats = new Label
+            {
+                Text = "Data Quota: Unlimited",
+                Font = new Font("Segoe UI", 8.0f, FontStyle.Regular),
+                ForeColor = Color.FromArgb(100, 200, 255),
+                Location = new Point(12, 86),
+                Size = new Size(338, 18)
+            };
+
+            _quotaProgressBar = new Panel
+            {
+                Location = new Point(12, 106),
+                Size = new Size(338, 8),
+                BackColor = Color.FromArgb(24, 24, 28)
+            };
+            _quotaProgressBar.Paint += (s, e) =>
+            {
+                Graphics g = e.Graphics;
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                int pw = _quotaProgressBar.Width - 1;
+                int ph = _quotaProgressBar.Height - 1;
+
+                using (var bgBrush = new SolidBrush(Color.FromArgb(40, 40, 45)))
+                using (var path = GetRoundedRect(0, 0, pw, ph, 3))
+                {
+                    g.FillPath(bgBrush, path);
+                }
+
+                if (_quotaPercent > 0f)
+                {
+                    int fillW = Math.Max(6, (int)(pw * Math.Min(1.0f, _quotaPercent / 100.0f)));
+                    Color barCol = _quotaPercent > 95f ? Color.FromArgb(255, 75, 75) :
+                                   _quotaPercent > 80f ? Color.FromArgb(255, 170, 40) :
+                                                         Color.FromArgb(76, 194, 255);
+                    using (var fillBrush = new SolidBrush(barCol))
+                    using (var fillPath = GetRoundedRect(0, 0, fillW, ph, 3))
+                    {
+                        g.FillPath(fillBrush, fillPath);
+                    }
+                }
             };
 
             _lblTopApps = new Label
@@ -393,13 +453,15 @@ namespace MetriX.UI
                 Text = "Top Network Apps:\nDetecting...",
                 Font = new Font("Segoe UI", 8.0f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(170, 210, 255),
-                Location = new Point(12, 102),
-                Size = new Size(330, 48)
+                Location = new Point(12, 122),
+                Size = new Size(338, 48)
             };
 
             cardSession.Controls.Add(lblCardTitle);
             cardSession.Controls.Add(_lblAdapterInfo);
             cardSession.Controls.Add(_lblSessionTotals);
+            cardSession.Controls.Add(_lblQuotaStats);
+            cardSession.Controls.Add(_quotaProgressBar);
             cardSession.Controls.Add(_lblTopApps);
             container.Controls.Add(cardSession);
         }
@@ -795,8 +857,8 @@ namespace MetriX.UI
             }
 
             float dpi = DpiHelper.GetDpiScale(Handle);
-            int w = DpiHelper.Scale(384, dpi);
-            int h = DpiHelper.Scale(495, dpi);
+            int w = DpiHelper.Scale(390, dpi);
+            int h = DpiHelper.Scale(525, dpi);
             Size = new Size(w, h);
 
             Screen scr = Screen.FromRectangle(meterBounds);
@@ -845,13 +907,35 @@ namespace MetriX.UI
             string speedStr = speedBps > 0 ? FormatLinkSpeed(speedBps) : "Active";
             _lblAdapterInfo.Text = string.Format("Adapter: {0}\n{1} • {2}", alias, desc, speedStr);
 
-            // Session data
+            // Session data & Quota calculation
             ulong dlBytes = _networkMonitor.SessionDownloadedBytes;
             ulong ulBytes = _networkMonitor.SessionUploadedBytes;
+            ulong totalBytes = dlBytes + ulBytes;
             TimeSpan duration = DateTime.Now - _networkMonitor.SessionStartTime;
             string timeStr = string.Format("{0:00}h {1:00}m {2:00}s", (int)duration.TotalHours, duration.Minutes, duration.Seconds);
             _lblSessionTotals.Text = string.Format("Downloaded: {0}  |  Uploaded: {1}\nSession Duration: {2}",
                 FormatBytes(dlBytes), FormatBytes(ulBytes), timeStr);
+
+            double quotaGb = _configService.Config.MonthlyDataQuotaGb;
+            if (quotaGb > 0)
+            {
+                double usedGb = totalBytes / 1073741824.0;
+                double pct = Math.Min(100.0, (usedGb / quotaGb) * 100.0);
+                double remGb = Math.Max(0.0, quotaGb - usedGb);
+                _lblQuotaStats.Text = string.Format("Data Quota: {0:F2} GB / {1:F0} GB ({2:F1}%) • {3:F2} GB left",
+                    usedGb, quotaGb, pct, remGb);
+                _lblQuotaStats.ForeColor = pct > 95.0 ? Color.FromArgb(255, 100, 100) :
+                                           pct > 80.0 ? Color.FromArgb(255, 180, 60) :
+                                                        Color.FromArgb(100, 200, 255);
+                _quotaPercent = (float)pct;
+            }
+            else
+            {
+                _lblQuotaStats.Text = string.Format("Data Quota: Unlimited ({0} transferred)", FormatBytes(totalBytes));
+                _lblQuotaStats.ForeColor = Color.FromArgb(170, 170, 175);
+                _quotaPercent = 0f;
+            }
+            if (_quotaProgressBar != null) _quotaProgressBar.Invalidate();
 
             // Active network processes attribution
             try
@@ -1111,6 +1195,23 @@ namespace MetriX.UI
                 return true;
             }
             return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        private static GraphicsPath GetRoundedRect(int x, int y, int width, int height, int radius)
+        {
+            GraphicsPath path = new GraphicsPath();
+            int diameter = radius * 2;
+            Rectangle arc = new Rectangle(x, y, diameter, diameter);
+
+            path.AddArc(arc, 180, 90);
+            arc.X = x + width - diameter;
+            path.AddArc(arc, 270, 90);
+            arc.Y = y + height - diameter;
+            path.AddArc(arc, 0, 90);
+            arc.X = x;
+            path.AddArc(arc, 90, 90);
+            path.CloseFigure();
+            return path;
         }
     }
 }

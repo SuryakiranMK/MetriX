@@ -75,6 +75,7 @@ namespace MetriX.Model
         public bool StartWithWindows { get; set; }
         public LeftClickAction LeftClickAction { get; set; }
         public bool ShowOnAllMonitors { get; set; }
+        public double MonthlyDataQuotaGb { get; set; }
 
         public AppConfig()
         {
@@ -114,6 +115,7 @@ namespace MetriX.Model
             StartWithWindows = false;
             LeftClickAction = LeftClickAction.Flyout;
             ShowOnAllMonitors = true;
+            MonthlyDataQuotaGb = 0.0;
         }
     }
 }

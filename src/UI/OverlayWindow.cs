@@ -107,11 +107,16 @@ namespace MetriX.UI
             _contextMenu = new ContextMenuStrip();
             _contextMenu.Renderer = new Windows11MenuRenderer();
 
+            var itemFlyout = new ToolStripMenuItem("📈  Network Graph & Speed Test...", null, (s, e) =>
+            {
+                if (RequestToggleFlyout != null) RequestToggleFlyout();
+            });
+            itemFlyout.Font = new Font("Segoe UI", 9.0f, FontStyle.Bold);
+
             var itemSettings = new ToolStripMenuItem("⚙  Settings & Customization...", null, (s, e) =>
             {
                 if (RequestOpenSettings != null) RequestOpenSettings();
             });
-            itemSettings.Font = new Font("Segoe UI", 9.0f, FontStyle.Bold);
 
             var itemLayout = new ToolStripMenuItem("🔄  Display Layout");
             itemLayout.DropDown.Renderer = new Windows11MenuRenderer();
@@ -151,6 +156,7 @@ namespace MetriX.UI
                 itemStartup.Checked = cfg.StartWithWindows;
             };
 
+            _contextMenu.Items.Add(itemFlyout);
             _contextMenu.Items.Add(itemSettings);
             _contextMenu.Items.Add(new ToolStripSeparator());
             _contextMenu.Items.Add(itemLayout);

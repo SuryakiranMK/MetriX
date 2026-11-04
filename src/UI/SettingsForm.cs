@@ -61,6 +61,7 @@ namespace MetriX.UI
         private ComboBox _cbAdapter;
         private ComboBox _cbRefreshInterval;
         private ComboBox _cbLeftClickAction;
+        private FluentNumericStepper _stepperDataQuota;
         private FluentToggleSwitch _toggleStartWithWindows;
 
         public SettingsForm(ConfigService configService, NetworkMonitor networkMonitor, Action onSettingsUpdated)
@@ -138,15 +139,16 @@ namespace MetriX.UI
                 SelectedAdapterAlias = src.SelectedAdapterAlias,
                 StartWithWindows = src.StartWithWindows,
                 LeftClickAction = src.LeftClickAction,
-                ShowOnAllMonitors = src.ShowOnAllMonitors
+                ShowOnAllMonitors = src.ShowOnAllMonitors,
+                MonthlyDataQuotaGb = src.MonthlyDataQuotaGb
             };
         }
 
         private void InitializeFluentWindow()
         {
             Text = "metriX Settings";
-            Width = 740;
-            Height = 640;
+            Width = 800;
+            Height = 690;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
@@ -168,7 +170,7 @@ namespace MetriX.UI
             _navRail = new Panel
             {
                 Location = new Point(14, 14),
-                Size = new Size(190, 550),
+                Size = new Size(195, 590),
                 BackColor = Color.FromArgb(24, 24, 26)
             };
             _navRail.Paint += (s, e) =>
@@ -221,9 +223,10 @@ namespace MetriX.UI
                     BackColor = Color.Transparent,
                     TextAlign = ContentAlignment.MiddleLeft,
                     FlatStyle = FlatStyle.Flat,
-                    Size = new Size(174, 40),
+                    Size = new Size(179, 40),
                     Location = new Point(8, btnY),
-                    Cursor = Cursors.Hand
+                    Cursor = Cursors.Hand,
+                    UseMnemonic = false
                 };
                 btn.FlatAppearance.BorderSize = 0;
                 btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(38, 38, 42);
@@ -279,8 +282,8 @@ namespace MetriX.UI
         {
             _contentContainer = new Panel
             {
-                Location = new Point(216, 14),
-                Size = new Size(495, 550),
+                Location = new Point(222, 14),
+                Size = new Size(550, 590),
                 BackColor = Color.Transparent
             };
 
@@ -288,7 +291,7 @@ namespace MetriX.UI
             var previewCard = new Panel
             {
                 Location = new Point(0, 0),
-                Size = new Size(495, 78),
+                Size = new Size(550, 78),
                 BackColor = Color.FromArgb(24, 24, 26)
             };
             previewCard.Paint += (s, e) =>
@@ -312,7 +315,7 @@ namespace MetriX.UI
             _previewPanel = new Panel
             {
                 Location = new Point(14, 26),
-                Size = new Size(467, 44),
+                Size = new Size(522, 44),
                 BackColor = Color.FromArgb(18, 18, 20)
             };
             _previewPanel.Paint += OnPreviewPaint;
@@ -320,9 +323,9 @@ namespace MetriX.UI
 
             _contentContainer.Controls.Add(previewCard);
 
-            // Container for scrollable page contents
+            // Container for page contents
             int pageY = 88;
-            int pageH = 462;
+            int pageH = 500;
 
             // Page 0: Position & Layout
             var pagePos = CreateScrollablePage(pageY, pageH);
@@ -356,8 +359,8 @@ namespace MetriX.UI
             return new Panel
             {
                 Location = new Point(0, y),
-                Size = new Size(495, height),
-                AutoScroll = true,
+                Size = new Size(550, height),
+                AutoScroll = false,
                 BackColor = Color.Transparent,
                 Visible = false
             };
@@ -368,7 +371,7 @@ namespace MetriX.UI
             int y = 6;
 
             // Card 1: Taskbar Position
-            _cbPosition = CreateStyledComboBox(210);
+            _cbPosition = CreateStyledComboBox(235);
             _cbPosition.Items.AddRange(new object[] {
                 "Right (Left of System Tray)",
                 "Left (Near Start / Widgets)",
@@ -383,7 +386,7 @@ namespace MetriX.UI
             y += 68;
 
             // Card 2: Display Layout Mode
-            _cbLayout = CreateStyledComboBox(210);
+            _cbLayout = CreateStyledComboBox(235);
             _cbLayout.Items.AddRange(new object[] {
                 "Stacked (Two Rows - Clock Height)",
                 "Horizontal (Single Row)"
@@ -397,7 +400,7 @@ namespace MetriX.UI
             y += 68;
 
             // Card 3: Horizontal Offset X
-            _stepperOffsetX = new FluentNumericStepper { Minimum = -2000, Maximum = 2000, Increment = 5, Suffix = " px" };
+            _stepperOffsetX = new FluentNumericStepper { Minimum = -2000, Maximum = 2000, Increment = 5, Suffix = " px", Size = new Size(116, 28) };
             _stepperOffsetX.ValueChanged += (s, e) =>
             {
                 _workingConfig.OffsetX = (int)_stepperOffsetX.Value;
@@ -407,7 +410,7 @@ namespace MetriX.UI
             y += 68;
 
             // Card 4: Vertical Offset Y
-            _stepperOffsetY = new FluentNumericStepper { Minimum = -100, Maximum = 100, Increment = 1, Suffix = " px" };
+            _stepperOffsetY = new FluentNumericStepper { Minimum = -100, Maximum = 100, Increment = 1, Suffix = " px", Size = new Size(116, 28) };
             _stepperOffsetY.ValueChanged += (s, e) =>
             {
                 _workingConfig.OffsetY = (int)_stepperOffsetY.Value;
@@ -431,7 +434,7 @@ namespace MetriX.UI
             int y = 6;
 
             // Card 1: Font Family
-            _cbFont = CreateStyledComboBox(210);
+            _cbFont = CreateStyledComboBox(235);
             _cbFont.Items.AddRange(new object[] {
                 "Segoe UI Variable Text",
                 "Segoe UI",
@@ -449,8 +452,8 @@ namespace MetriX.UI
             y += 68;
 
             // Card 2: Font Size & Bold
-            var pnlFontProps = new Panel { Size = new Size(210, 32), BackColor = Color.Transparent };
-            _stepperFontSize = new FluentNumericStepper { Minimum = 6, Maximum = 24, Increment = 0.5m, DecimalPlaces = 1, Suffix = " pt", Size = new Size(116, 28) };
+            var pnlFontProps = new Panel { Size = new Size(235, 32), BackColor = Color.Transparent };
+            _stepperFontSize = new FluentNumericStepper { Minimum = 6, Maximum = 24, Increment = 0.5m, DecimalPlaces = 1, Suffix = " pt", Size = new Size(110, 28) };
             _stepperFontSize.ValueChanged += (s, e) =>
             {
                 _workingConfig.FontSize = (float)_stepperFontSize.Value;
@@ -458,7 +461,7 @@ namespace MetriX.UI
             };
             pnlFontProps.Controls.Add(_stepperFontSize);
 
-            _toggleFontBold = new FluentToggleSwitch { Location = new Point(140, 3) };
+            _toggleFontBold = new FluentToggleSwitch { Location = new Point(125, 3) };
             _toggleFontBold.CheckedChanged += (s, e) =>
             {
                 _workingConfig.FontBold = _toggleFontBold.Checked;
@@ -466,14 +469,14 @@ namespace MetriX.UI
             };
             pnlFontProps.Controls.Add(_toggleFontBold);
 
-            var lblBold = new Label { Text = "Bold", Font = new Font("Segoe UI", 7.5f), ForeColor = Color.FromArgb(170, 170, 175), Location = new Point(184, 8), AutoSize = true };
+            var lblBold = new Label { Text = "Bold", Font = new Font("Segoe UI", 8.0f), ForeColor = Color.FromArgb(170, 170, 175), Location = new Point(175, 7), AutoSize = true, UseMnemonic = false };
             pnlFontProps.Controls.Add(lblBold);
 
             page.Controls.Add(new FluentSettingCard("Digits Font Size & Weight", "Configure size (pt) and bold weight for speed numbers", pnlFontProps) { Location = new Point(0, y) });
             y += 68;
 
             // Card 3: Unit Size
-            _stepperUnitFontSize = new FluentNumericStepper { Minimum = 5, Maximum = 20, Increment = 0.5m, DecimalPlaces = 1, Suffix = " pt" };
+            _stepperUnitFontSize = new FluentNumericStepper { Minimum = 5, Maximum = 20, Increment = 0.5m, DecimalPlaces = 1, Suffix = " pt", Size = new Size(116, 28) };
             _stepperUnitFontSize.ValueChanged += (s, e) =>
             {
                 _workingConfig.UnitFontSize = (float)_stepperUnitFontSize.Value;
@@ -494,10 +497,10 @@ namespace MetriX.UI
             y += 68;
 
             // Card 5: Speed Accent Colors
-            var pnlColorChips = new Panel { Size = new Size(210, 34), BackColor = Color.Transparent };
+            var pnlColorChips = new Panel { Size = new Size(235, 34), BackColor = Color.Transparent };
             _chipUploadColor = CreateColorChip(0, "Upload", hex => _workingConfig.UploadColor = hex);
-            _chipDownloadColor = CreateColorChip(70, "Download", hex => _workingConfig.DownloadColor = hex);
-            _chipLabelColor = CreateColorChip(140, "Units", hex => _workingConfig.LabelColor = hex);
+            _chipDownloadColor = CreateColorChip(78, "Download", hex => _workingConfig.DownloadColor = hex);
+            _chipLabelColor = CreateColorChip(156, "Units", hex => _workingConfig.LabelColor = hex);
 
             pnlColorChips.Controls.Add(_chipUploadColor);
             pnlColorChips.Controls.Add(_chipDownloadColor);
@@ -509,9 +512,9 @@ namespace MetriX.UI
             // Card 6: Color Presets
             var pnlPresets = new Panel { Size = new Size(240, 32), BackColor = Color.Transparent };
             Button btnFluent = CreatePresetButton("Default", 0, "#4CC2FF", "#6CCB5F", "#D0D0D0");
-            Button btnBlue = CreatePresetButton("Windows", 60, "#60CDFF", "#0078D4", "#CCCCCC");
-            Button btnAmber = CreatePresetButton("Amber", 120, "#FFA726", "#FB8C00", "#F5F5F5");
-            Button btnMono = CreatePresetButton("Mono", 180, "#FFFFFF", "#CCCCCC", "#999999");
+            Button btnBlue = CreatePresetButton("Windows", 58, "#60CDFF", "#0078D4", "#CCCCCC");
+            Button btnAmber = CreatePresetButton("Amber", 116, "#FFA726", "#FB8C00", "#F5F5F5");
+            Button btnMono = CreatePresetButton("Mono", 174, "#FFFFFF", "#CCCCCC", "#999999");
             pnlPresets.Controls.Add(btnFluent);
             pnlPresets.Controls.Add(btnBlue);
             pnlPresets.Controls.Add(btnAmber);
@@ -535,7 +538,7 @@ namespace MetriX.UI
             int y = 6;
 
             // Card 1: Arrow Glyphs
-            _cbArrowStyle = CreateStyledComboBox(210);
+            _cbArrowStyle = CreateStyledComboBox(235);
             _cbArrowStyle.Items.AddRange(new object[] {
                 "Triangles (▲ / ▼)",
                 "Arrows (↑ / ↓)",
@@ -551,7 +554,7 @@ namespace MetriX.UI
             y += 68;
 
             // Card 2: Unit Mode
-            _cbUnitMode = CreateStyledComboBox(210);
+            _cbUnitMode = CreateStyledComboBox(235);
             _cbUnitMode.Items.AddRange(new object[] {
                 "Auto Bytes (B/s, KB/s, MB/s)",
                 "Auto Bits (bps, Kbps, Mbps)",
@@ -567,7 +570,7 @@ namespace MetriX.UI
             y += 68;
 
             // Card 3: Decimal Places
-            _stepperDecimals = new FluentNumericStepper { Minimum = 0, Maximum = 3, Increment = 1, Suffix = " digits" };
+            _stepperDecimals = new FluentNumericStepper { Minimum = 0, Maximum = 3, Increment = 1, Suffix = " digits", Size = new Size(116, 28) };
             _stepperDecimals.ValueChanged += (s, e) =>
             {
                 _workingConfig.DecimalPlaces = (int)_stepperDecimals.Value;
@@ -577,8 +580,8 @@ namespace MetriX.UI
             y += 68;
 
             // Card 4: Horizontal & Vertical Padding
-            var pnlPaddings = new Panel { Size = new Size(210, 32), BackColor = Color.Transparent };
-            _stepperPaddingX = new FluentNumericStepper { Minimum = 0, Maximum = 40, Increment = 1, Suffix = " X", Size = new Size(100, 28) };
+            var pnlPaddings = new Panel { Size = new Size(235, 32), BackColor = Color.Transparent };
+            _stepperPaddingX = new FluentNumericStepper { Minimum = 0, Maximum = 40, Increment = 1, Suffix = " X", Size = new Size(108, 28) };
             _stepperPaddingX.ValueChanged += (s, e) =>
             {
                 _workingConfig.PaddingX = (int)_stepperPaddingX.Value;
@@ -586,7 +589,7 @@ namespace MetriX.UI
             };
             pnlPaddings.Controls.Add(_stepperPaddingX);
 
-            _stepperPaddingY = new FluentNumericStepper { Minimum = 0, Maximum = 20, Increment = 1, Suffix = " Y", Size = new Size(100, 28), Location = new Point(106, 0) };
+            _stepperPaddingY = new FluentNumericStepper { Minimum = 0, Maximum = 20, Increment = 1, Suffix = " Y", Size = new Size(108, 28), Location = new Point(118, 0) };
             _stepperPaddingY.ValueChanged += (s, e) =>
             {
                 _workingConfig.PaddingY = (int)_stepperPaddingY.Value;
@@ -598,7 +601,7 @@ namespace MetriX.UI
             y += 68;
 
             // Card 5: Item Spacing
-            _stepperSpacing = new FluentNumericStepper { Minimum = 0, Maximum = 30, Increment = 1, Suffix = " px" };
+            _stepperSpacing = new FluentNumericStepper { Minimum = 0, Maximum = 30, Increment = 1, Suffix = " px", Size = new Size(116, 28) };
             _stepperSpacing.ValueChanged += (s, e) =>
             {
                 _workingConfig.ItemSpacing = (int)_stepperSpacing.Value;
@@ -608,7 +611,7 @@ namespace MetriX.UI
             y += 68;
 
             // Card 6: Overall Opacity
-            _stepperOverallOpacity = new FluentNumericStepper { Minimum = 30, Maximum = 100, Increment = 5, Suffix = "%" };
+            _stepperOverallOpacity = new FluentNumericStepper { Minimum = 30, Maximum = 100, Increment = 5, Suffix = "%", Size = new Size(116, 28) };
             _stepperOverallOpacity.ValueChanged += (s, e) =>
             {
                 _workingConfig.OverallOpacityPercent = (int)_stepperOverallOpacity.Value;
@@ -618,8 +621,8 @@ namespace MetriX.UI
             y += 68;
 
             // Card 7: Idle Traffic Dimming
-            var pnlIdle = new Panel { Size = new Size(210, 32), BackColor = Color.Transparent };
-            _stepperIdleOpacity = new FluentNumericStepper { Minimum = 10, Maximum = 90, Increment = 5, Suffix = "%", Size = new Size(116, 28) };
+            var pnlIdle = new Panel { Size = new Size(235, 32), BackColor = Color.Transparent };
+            _stepperIdleOpacity = new FluentNumericStepper { Minimum = 10, Maximum = 90, Increment = 5, Suffix = "%", Size = new Size(115, 28) };
             _stepperIdleOpacity.ValueChanged += (s, e) =>
             {
                 _workingConfig.IdleOpacityPercent = (int)_stepperIdleOpacity.Value;
@@ -643,7 +646,7 @@ namespace MetriX.UI
             int y = 6;
 
             // Card 1: Network Adapter
-            _cbAdapter = CreateStyledComboBox(220);
+            _cbAdapter = CreateStyledComboBox(235);
             _cbAdapter.Items.Add("All Active Adapters (Aggregated)");
             try
             {
@@ -663,7 +666,7 @@ namespace MetriX.UI
             y += 68;
 
             // Card 2: Sampling Refresh Rate
-            _cbRefreshInterval = CreateStyledComboBox(220);
+            _cbRefreshInterval = CreateStyledComboBox(235);
             _cbRefreshInterval.Items.AddRange(new object[] {
                 "500 ms (Fast)",
                 "1000 ms (Recommended)",
@@ -681,7 +684,7 @@ namespace MetriX.UI
             y += 68;
 
             // Card 3: Left-Click Action
-            _cbLeftClickAction = CreateStyledComboBox(220);
+            _cbLeftClickAction = CreateStyledComboBox(235);
             _cbLeftClickAction.Items.AddRange(new object[] {
                 "Open Taskbar Flyout Popup",
                 "Open Windows Task Manager",
@@ -700,7 +703,16 @@ namespace MetriX.UI
             page.Controls.Add(new FluentSettingCard("Taskbar Left-Click Action", "Action triggered when clicking the meter on your taskbar", _cbLeftClickAction) { Location = new Point(0, y) });
             y += 68;
 
-            // Card 4: Start with Windows
+            // Card 4: Monthly Data Quota
+            _stepperDataQuota = new FluentNumericStepper { Minimum = 0, Maximum = 5000, Increment = 10, Suffix = " GB", Size = new Size(116, 28) };
+            _stepperDataQuota.ValueChanged += (s, e) =>
+            {
+                _workingConfig.MonthlyDataQuotaGb = (double)_stepperDataQuota.Value;
+            };
+            page.Controls.Add(new FluentSettingCard("Monthly Data Quota", "Display visual quota usage bar in flyout (0 = Unlimited)", _stepperDataQuota) { Location = new Point(0, y) });
+            y += 68;
+
+            // Card 5: Start with Windows
             _toggleStartWithWindows = new FluentToggleSwitch();
             _toggleStartWithWindows.CheckedChanged += (s, e) =>
             {
@@ -716,18 +728,20 @@ namespace MetriX.UI
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Width = width,
-                Height = 30,
                 BackColor = Color.FromArgb(36, 36, 40),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
                 DrawMode = DrawMode.OwnerDrawFixed,
-                ItemHeight = 24
+                ItemHeight = 22
             };
 
             cb.DrawItem += (s, e) =>
             {
                 if (e.Index < 0) return;
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                e.Graphics.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
+
                 bool selected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
                 Color bg = selected ? Color.FromArgb(0, 120, 215) : Color.FromArgb(36, 36, 40);
                 using (var brush = new SolidBrush(bg))
@@ -735,10 +749,9 @@ namespace MetriX.UI
                     e.Graphics.FillRectangle(brush, e.Bounds);
                 }
                 string itemText = cb.Items[e.Index].ToString();
-                using (var textBrush = new SolidBrush(Color.White))
-                {
-                    e.Graphics.DrawString(itemText, cb.Font, textBrush, e.Bounds.X + 6, e.Bounds.Y + 3);
-                }
+                Rectangle textRect = new Rectangle(e.Bounds.X + 8, e.Bounds.Y, Math.Max(10, e.Bounds.Width - 16), e.Bounds.Height);
+                TextRenderer.DrawText(e.Graphics, itemText, cb.Font, textRect, Color.White,
+                    TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
             };
 
             return cb;
@@ -749,7 +762,7 @@ namespace MetriX.UI
             var pnl = new Panel
             {
                 Location = new Point(x, 2),
-                Size = new Size(62, 28),
+                Size = new Size(70, 28),
                 BackColor = Color.FromArgb(76, 194, 255),
                 Cursor = Cursors.Hand
             };
@@ -869,8 +882,8 @@ namespace MetriX.UI
         {
             var pnlBar = new Panel
             {
-                Location = new Point(0, 565),
-                Size = new Size(Width, 50),
+                Dock = DockStyle.Bottom,
+                Height = 52,
                 BackColor = Color.FromArgb(24, 24, 26)
             };
 
@@ -890,8 +903,9 @@ namespace MetriX.UI
                 BackColor = Color.Transparent,
                 FlatStyle = FlatStyle.Flat,
                 Size = new Size(130, 32),
-                Location = new Point(14, 9),
-                Cursor = Cursors.Hand
+                Location = new Point(14, 10),
+                Cursor = Cursors.Hand,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left
             };
             btnReset.FlatAppearance.BorderSize = 0;
             btnReset.Click += (s, e) =>
@@ -912,8 +926,9 @@ namespace MetriX.UI
                 BackColor = Color.FromArgb(0, 120, 215),
                 FlatStyle = FlatStyle.Flat,
                 Size = new Size(125, 32),
-                Location = new Point(Width - 280, 9),
-                Cursor = Cursors.Hand
+                Location = new Point(pnlBar.Width - 245, 10),
+                Cursor = Cursors.Hand,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
             btnSave.FlatAppearance.BorderSize = 0;
             btnSave.Click += (s, e) => ApplyAndClose();
@@ -926,8 +941,9 @@ namespace MetriX.UI
                 BackColor = Color.FromArgb(42, 42, 46),
                 FlatStyle = FlatStyle.Flat,
                 Size = new Size(95, 32),
-                Location = new Point(Width - 145, 9),
-                Cursor = Cursors.Hand
+                Location = new Point(pnlBar.Width - 110, 10),
+                Cursor = Cursors.Hand,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
             btnCancel.FlatAppearance.BorderColor = Color.FromArgb(60, 60, 65);
             btnCancel.Click += (s, e) => Close();
@@ -992,6 +1008,7 @@ namespace MetriX.UI
             else if (_workingConfig.LeftClickAction == LeftClickAction.TaskManager) _cbLeftClickAction.SelectedIndex = 1;
             else _cbLeftClickAction.SelectedIndex = 2;
 
+            _stepperDataQuota.Value = (decimal)_workingConfig.MonthlyDataQuotaGb;
             _toggleStartWithWindows.Checked = _workingConfig.StartWithWindows;
         }
 
@@ -1096,6 +1113,10 @@ namespace MetriX.UI
 
         private void ApplyAndClose()
         {
+            if (_stepperDataQuota != null)
+            {
+                _workingConfig.MonthlyDataQuotaGb = (double)_stepperDataQuota.Value;
+            }
             _configService.Save(_workingConfig);
             if (_onSettingsUpdated != null) _onSettingsUpdated();
             Close();

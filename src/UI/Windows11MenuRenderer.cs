@@ -103,7 +103,7 @@ namespace MetriX.UI
             Color col = e.Item.Enabled ? TextColor : SubTextColor;
             using (var brush = new SolidBrush(col))
             {
-                TextFormatFlags flags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine;
+                TextFormatFlags flags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix;
                 TextRenderer.DrawText(g, e.Text, e.TextFont, textRect, col, flags);
             }
 

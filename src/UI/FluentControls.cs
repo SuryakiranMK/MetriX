@@ -305,13 +305,9 @@ namespace MetriX.UI
             // Draw formatted value text
             string format = _decimalPlaces > 0 ? "F" + _decimalPlaces : "F0";
             string text = _value.ToString(format) + _suffix;
-            SizeF sz = g.MeasureString(text, Font);
-            float tx = (w - sz.Width) / 2;
-            float ty = (h - sz.Height) / 2;
-            using (var textBrush = new SolidBrush(ForeColor))
-            {
-                g.DrawString(text, Font, textBrush, tx, ty);
-            }
+            Rectangle valRect = new Rectangle(30, 0, Math.Max(10, w - 60), h);
+            TextRenderer.DrawText(g, text, Font, valRect, ForeColor,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
         }
 
         private static GraphicsPath GetRoundedRect(int x, int y, int width, int height, int radius)
@@ -352,18 +348,29 @@ namespace MetriX.UI
             set { _lblDesc.Text = value; }
         }
 
-        public FluentSettingCard(string title, string description, Control actionControl, int cardHeight = 60)
+        public FluentSettingCard(string title, string description, Control actionControl, int cardHeight = 62)
         {
-            Size = new Size(470, cardHeight);
+            Size = new Size(535, cardHeight);
             BackColor = Color.FromArgb(32, 32, 36);
+
+            if (actionControl != null)
+            {
+                actionControl.Location = new Point(Width - actionControl.Width - 14, (cardHeight - actionControl.Height) / 2);
+                Controls.Add(actionControl);
+            }
+
+            int maxTextWidth = (actionControl != null) ? (actionControl.Left - 24) : (Width - 28);
+            if (maxTextWidth < 140) maxTextWidth = 140;
 
             _lblTitle = new Label
             {
                 Text = title,
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
                 ForeColor = Color.White,
-                Location = new Point(14, 10),
-                AutoSize = true
+                Location = new Point(14, 11),
+                AutoSize = true,
+                UseMnemonic = false,
+                MaximumSize = new Size(maxTextWidth, 0)
             };
 
             _lblDesc = new Label
@@ -371,18 +378,14 @@ namespace MetriX.UI
                 Text = description,
                 Font = new Font("Segoe UI", 7.5f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(160, 160, 165),
-                Location = new Point(14, 30),
-                AutoSize = true
+                Location = new Point(14, 31),
+                AutoSize = true,
+                UseMnemonic = false,
+                MaximumSize = new Size(maxTextWidth, 0)
             };
 
             Controls.Add(_lblTitle);
             Controls.Add(_lblDesc);
-
-            if (actionControl != null)
-            {
-                actionControl.Location = new Point(Width - actionControl.Width - 14, (cardHeight - actionControl.Height) / 2);
-                Controls.Add(actionControl);
-            }
 
             Paint += (s, e) =>
             {
