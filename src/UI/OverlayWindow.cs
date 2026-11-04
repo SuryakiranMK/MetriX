@@ -61,8 +61,36 @@ namespace MetriX.UI
                 cp.ExStyle |= NativeMethods.WS_EX_TOOLWINDOW;
                 cp.ExStyle |= NativeMethods.WS_EX_NOACTIVATE;
                 cp.ExStyle |= NativeMethods.WS_EX_TOPMOST;
+                if (_taskbarTracker != null && _taskbarTracker.TaskbarHandle != IntPtr.Zero)
+                {
+                    cp.Parent = _taskbarTracker.TaskbarHandle;
+                }
                 return cp;
             }
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            EnsureTaskbarOwnership();
+        }
+
+        public void EnsureTaskbarOwnership()
+        {
+            try
+            {
+                if (_taskbarTracker == null || !IsHandleCreated) return;
+                IntPtr hTaskbar = _taskbarTracker.TaskbarHandle;
+                if (hTaskbar != IntPtr.Zero)
+                {
+                    IntPtr currentOwner = NativeMethods.GetWindowLongPtr(Handle, NativeMethods.GWLP_HWNDPARENT);
+                    if (currentOwner != hTaskbar)
+                    {
+                        NativeMethods.SetWindowLongPtr(Handle, NativeMethods.GWLP_HWNDPARENT, hTaskbar);
+                    }
+                }
+            }
+            catch { }
         }
 
         private void BuildContextMenu()
@@ -156,6 +184,8 @@ namespace MetriX.UI
         public void RenderFrame()
         {
             if (IsDisposed || !IsHandleCreated) return;
+
+            EnsureTaskbarOwnership();
 
             var cfg = _configService.Config;
             var stats = _networkMonitor.CurrentStats;
@@ -562,9 +592,25 @@ namespace MetriX.UI
                 return;
             }
 
+            if (m.Msg == NativeMethods.WM_WINDOWPOSCHANGING)
+            {
+                try
+                {
+                    NativeMethods.WINDOWPOS wp = (NativeMethods.WINDOWPOS)Marshal.PtrToStructure(m.LParam, typeof(NativeMethods.WINDOWPOS));
+                    if (wp.hwndInsertAfter != NativeMethods.HWND_TOPMOST)
+                    {
+                        wp.hwndInsertAfter = NativeMethods.HWND_TOPMOST;
+                        wp.flags &= ~NativeMethods.SWP_NOZORDER;
+                        Marshal.StructureToPtr(wp, m.LParam, false);
+                    }
+                }
+                catch { }
+            }
+
             if (m.Msg == (int)_msgTaskbarCreated)
             {
                 _taskbarTracker.RefreshHandles();
+                EnsureTaskbarOwnership();
                 RenderFrame();
                 return;
             }
@@ -575,6 +621,7 @@ namespace MetriX.UI
             if (m.Msg == WM_DISPLAYCHANGE || m.Msg == WM_DPICHANGED)
             {
                 _taskbarTracker.RefreshHandles();
+                EnsureTaskbarOwnership();
                 RenderFrame();
             }
 

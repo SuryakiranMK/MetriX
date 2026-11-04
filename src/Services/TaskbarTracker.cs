@@ -18,6 +18,15 @@ namespace MetriX.Services
 
         public bool IsTaskbarFound { get { return _hTaskbar != IntPtr.Zero; } }
 
+        public IntPtr TaskbarHandle
+        {
+            get
+            {
+                if (_hTaskbar == IntPtr.Zero) RefreshHandles();
+                return _hTaskbar;
+            }
+        }
+
         public TaskbarTracker()
         {
             RefreshHandles();
