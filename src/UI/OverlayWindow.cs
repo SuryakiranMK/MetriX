@@ -105,21 +105,23 @@ namespace MetriX.UI
         private void BuildContextMenu()
         {
             _contextMenu = new ContextMenuStrip();
-            _contextMenu.Renderer = new ToolStripProfessionalRenderer(new Windows11ColorTable());
+            _contextMenu.Renderer = new Windows11MenuRenderer();
 
             var itemSettings = new ToolStripMenuItem("⚙  Settings & Customization...", null, (s, e) =>
             {
                 if (RequestOpenSettings != null) RequestOpenSettings();
             });
-            itemSettings.Font = new Font(itemSettings.Font, FontStyle.Bold);
+            itemSettings.Font = new Font("Segoe UI", 9.0f, FontStyle.Bold);
 
             var itemLayout = new ToolStripMenuItem("🔄  Display Layout");
+            itemLayout.DropDown.Renderer = new Windows11MenuRenderer();
             var itemStacked = new ToolStripMenuItem("Stacked (2 Rows)", null, (s, e) => ToggleLayout(LayoutMode.Stacked));
             var itemHorizontal = new ToolStripMenuItem("Horizontal (Single Row)", null, (s, e) => ToggleLayout(LayoutMode.Horizontal));
             itemLayout.DropDownItems.Add(itemStacked);
             itemLayout.DropDownItems.Add(itemHorizontal);
 
             var itemPosition = new ToolStripMenuItem("📍  Taskbar Position");
+            itemPosition.DropDown.Renderer = new Windows11MenuRenderer();
             var itemTray = new ToolStripMenuItem("Right (Left of System Tray)", null, (s, e) => SetPosition(PositionMode.LeftOfTray));
             var itemLeft = new ToolStripMenuItem("Left (Near Start / Widgets)", null, (s, e) => SetPosition(PositionMode.FarLeft));
             var itemApps = new ToolStripMenuItem("Center (Right of Open Apps)", null, (s, e) => SetPosition(PositionMode.RightOfApps));
@@ -648,22 +650,5 @@ namespace MetriX.UI
 
             base.WndProc(ref m);
         }
-    }
-
-    internal class Windows11ColorTable : ProfessionalColorTable
-    {
-        public override Color ToolStripDropDownBackground { get { return Color.FromArgb(36, 36, 36); } }
-        public override Color ImageMarginGradientBegin { get { return Color.FromArgb(36, 36, 36); } }
-        public override Color ImageMarginGradientMiddle { get { return Color.FromArgb(36, 36, 36); } }
-        public override Color ImageMarginGradientEnd { get { return Color.FromArgb(36, 36, 36); } }
-        public override Color MenuBorder { get { return Color.FromArgb(55, 55, 55); } }
-        public override Color MenuItemBorder { get { return Color.Transparent; } }
-        public override Color MenuItemSelected { get { return Color.FromArgb(50, 50, 50); } }
-        public override Color MenuStripGradientBegin { get { return Color.FromArgb(36, 36, 36); } }
-        public override Color MenuStripGradientEnd { get { return Color.FromArgb(36, 36, 36); } }
-        public override Color CheckBackground { get { return Color.FromArgb(60, 60, 60); } }
-        public override Color CheckSelectedBackground { get { return Color.FromArgb(80, 80, 80); } }
-        public override Color SeparatorDark { get { return Color.FromArgb(50, 50, 50); } }
-        public override Color SeparatorLight { get { return Color.Transparent; } }
     }
 }

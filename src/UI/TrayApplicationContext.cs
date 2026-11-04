@@ -41,10 +41,10 @@ namespace MetriX.UI
             };
 
             var menu = new ContextMenuStrip();
-            menu.Renderer = new ToolStripProfessionalRenderer(new Windows11ColorTable());
+            menu.Renderer = new Windows11MenuRenderer();
 
             var itemSettings = new ToolStripMenuItem("⚙  Settings & Customization...", null, (s, e) => ShowSettings());
-            itemSettings.Font = new Font(itemSettings.Font, FontStyle.Bold);
+            itemSettings.Font = new Font("Segoe UI", 9.0f, FontStyle.Bold);
 
             var itemExit = new ToolStripMenuItem("❌  Exit", null, (s, e) => ExitThread());
 
