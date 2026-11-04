@@ -15,6 +15,7 @@ dist/
 *.zip
 SHA256SUMS.txt
 release_notes*.md
+[Ss][Cc][Hh][Ee][Dd][Uu][Ll][Ee].[Mm][Dd]
 
 # Logs / Temp
 *.log
