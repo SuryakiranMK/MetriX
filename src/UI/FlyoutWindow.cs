@@ -175,8 +175,8 @@ namespace MetriX.UI
             // Segmented View Switcher Pill
             var pnlSegment = new Panel
             {
-                Size = new Size(164, 30),
-                Location = new Point((Width - 164) / 2, 8),
+                Size = new Size(184, 32),
+                Location = new Point(96, 7),
                 BackColor = Color.FromArgb(22, 22, 26)
             };
             pnlSegment.Paint += (s, e) =>
@@ -191,36 +191,42 @@ namespace MetriX.UI
 
             _tabBtnMonitor = new Button
             {
-                Text = "Live",
-                Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
-                Size = new Size(78, 24),
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
+                Size = new Size(88, 26),
                 Location = new Point(3, 3),
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand,
                 UseMnemonic = false,
-                Padding = new Padding(0),
-                TextAlign = ContentAlignment.MiddleCenter
+                Tag = "Live"
             };
             _tabBtnMonitor.FlatAppearance.BorderSize = 0;
             _tabBtnMonitor.FlatAppearance.MouseOverBackColor = Color.FromArgb(44, 44, 50);
             _tabBtnMonitor.FlatAppearance.MouseDownBackColor = Color.FromArgb(0, 100, 190);
+            _tabBtnMonitor.Paint += (s, e) =>
+            {
+                TextRenderer.DrawText(e.Graphics, (string)_tabBtnMonitor.Tag, _tabBtnMonitor.Font, _tabBtnMonitor.ClientRectangle, _tabBtnMonitor.ForeColor,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPadding);
+            };
             _tabBtnMonitor.Click += (s, e) => SwitchView(false);
 
             _tabBtnSpeedTest = new Button
             {
-                Text = "Speed",
-                Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
-                Size = new Size(78, 24),
-                Location = new Point(83, 3),
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
+                Size = new Size(88, 26),
+                Location = new Point(93, 3),
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand,
                 UseMnemonic = false,
-                Padding = new Padding(0),
-                TextAlign = ContentAlignment.MiddleCenter
+                Tag = "Speed"
             };
             _tabBtnSpeedTest.FlatAppearance.BorderSize = 0;
             _tabBtnSpeedTest.FlatAppearance.MouseOverBackColor = Color.FromArgb(44, 44, 50);
             _tabBtnSpeedTest.FlatAppearance.MouseDownBackColor = Color.FromArgb(0, 100, 190);
+            _tabBtnSpeedTest.Paint += (s, e) =>
+            {
+                TextRenderer.DrawText(e.Graphics, (string)_tabBtnSpeedTest.Tag, _tabBtnSpeedTest.Font, _tabBtnSpeedTest.ClientRectangle, _tabBtnSpeedTest.ForeColor,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPadding);
+            };
             _tabBtnSpeedTest.Click += (s, e) => SwitchView(true);
 
             pnlSegment.Controls.Add(_tabBtnMonitor);
@@ -228,21 +234,45 @@ namespace MetriX.UI
 
             var btnClose = new Button
             {
-                Text = "✕",
-                Font = new Font("Segoe UI", 10.0f, FontStyle.Regular),
-                ForeColor = Color.FromArgb(180, 180, 185),
+                Font = new Font("Segoe UI", 9.5f, FontStyle.Regular),
+                ForeColor = Color.FromArgb(190, 190, 195),
                 BackColor = Color.Transparent,
                 FlatStyle = FlatStyle.Flat,
-                Size = new Size(46, 46),
-                Location = new Point(Width - 46, 0),
+                Size = new Size(60, 26),
+                Location = new Point(Width - 60 - 12, 10),
                 Cursor = Cursors.Hand,
                 UseMnemonic = false
             };
             btnClose.FlatAppearance.BorderSize = 0;
-            btnClose.FlatAppearance.MouseOverBackColor = Color.FromArgb(196, 43, 28);
-            btnClose.FlatAppearance.MouseDownBackColor = Color.FromArgb(180, 35, 20);
-            btnClose.MouseEnter += (s, e) => { btnClose.ForeColor = Color.White; };
-            btnClose.MouseLeave += (s, e) => { btnClose.ForeColor = Color.FromArgb(180, 180, 185); };
+            bool isCloseHovered = false;
+            btnClose.MouseEnter += (s, e) =>
+            {
+                isCloseHovered = true;
+                btnClose.BackColor = Color.FromArgb(196, 43, 28);
+                btnClose.ForeColor = Color.White;
+                btnClose.Invalidate();
+            };
+            btnClose.MouseLeave += (s, e) =>
+            {
+                isCloseHovered = false;
+                btnClose.BackColor = Color.Transparent;
+                btnClose.ForeColor = Color.FromArgb(190, 190, 195);
+                btnClose.Invalidate();
+            };
+            btnClose.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                if (!isCloseHovered)
+                {
+                    using (var pen = new Pen(Color.FromArgb(50, 50, 56), 1))
+                    using (var path = GetRoundedRect(0, 0, btnClose.Width - 1, btnClose.Height - 1, 4))
+                    {
+                        e.Graphics.DrawPath(pen, path);
+                    }
+                }
+                TextRenderer.DrawText(e.Graphics, "✕", btnClose.Font, btnClose.ClientRectangle, btnClose.ForeColor,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPadding);
+            };
             btnClose.Click += (s, e) => Hide();
 
             headerPanel.Controls.Add(lblTitle);
@@ -383,6 +413,8 @@ namespace MetriX.UI
                 _tabBtnMonitor.BackColor = Color.Transparent;
                 _tabBtnMonitor.ForeColor = Color.FromArgb(170, 170, 175);
             }
+            _tabBtnMonitor.Invalidate();
+            _tabBtnSpeedTest.Invalidate();
         }
 
         private void BuildMonitorView(Panel container)
