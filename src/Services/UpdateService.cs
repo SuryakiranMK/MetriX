@@ -276,7 +276,7 @@ namespace MetriX.Services
             }
 
             bool isZip = downloadUrl.EndsWith(".zip", StringComparison.OrdinalIgnoreCase);
-            string tempDir = Path.Combine(Path.GetTempPath(), "metriX_update");
+            string tempDir = Path.Combine(Path.GetTempPath(), "metriX_update_" + Guid.NewGuid().ToString("N"));
             if (!Directory.Exists(tempDir))
             {
                 Directory.CreateDirectory(tempDir);
@@ -378,39 +378,41 @@ namespace MetriX.Services
             try
             {
                 int currentPid = Process.GetCurrentProcess().Id;
-                string currentExePath = Process.GetCurrentProcess().MainModule.FileName;
+                string currentExePath = Application.ExecutablePath;
                 string parentDir = Path.GetDirectoryName(currentExePath);
-                string scriptPath = Path.Combine(Path.GetTempPath(), "metriX_swap.cmd");
+                string scriptPath = Path.Combine(Path.GetTempPath(), "metriX_swap_" + Guid.NewGuid().ToString("N") + ".cmd");
 
-                // Micro-transition script: waits for current process to terminate, replaces binary, and relaunches
-                string cmd = string.Format(
-                    "@echo off\r\n" +
-                    "chcp 65001 >nul\r\n" +
-                    ":: Wait briefly for current process to release\r\n" +
-                    "timeout /t 1 /nobreak >nul\r\n" +
-                    ":: Ensure PID is terminated\r\n" +
-                    "taskkill /f /pid {0} >nul 2>&1\r\n" +
-                    ":retry\r\n" +
-                    "copy /y \"{1}\" \"{2}\" >nul 2>&1\r\n" +
-                    "if errorlevel 1 (\r\n" +
-                    "    timeout /t 1 /nobreak >nul\r\n" +
-                    "    goto retry\r\n" +
-                    ")\r\n" +
-                    "cd /d \"{3}\"\r\n" +
-                    "start \"\" \"{2}\"\r\n" +
-                    "del /f /q \"{1}\" >nul 2>&1\r\n" +
-                    "del /f /q \"%~f0\" >nul 2>&1\r\n",
-                    currentPid, newExePath, currentExePath, parentDir);
+                var sb = new StringBuilder();
+                sb.AppendLine("@echo off");
+                sb.AppendLine("chcp 65001 >nul");
+                sb.AppendLine("timeout /t 1 /nobreak >nul");
+                sb.AppendLine(string.Format("taskkill /f /pid {0} >nul 2>&1", currentPid));
+                sb.AppendLine("taskkill /f /im metriX.exe >nul 2>&1");
+                sb.AppendLine("ping 127.0.0.1 -n 2 >nul");
+                sb.AppendLine("set /a attempts=0");
+                sb.AppendLine(":retry");
+                sb.AppendLine("set /a attempts+=1");
+                sb.AppendLine(string.Format("copy /y \"{0}\" \"{1}\" >nul 2>&1", newExePath, currentExePath));
+                sb.AppendLine("if errorlevel 1 (");
+                sb.AppendLine("    if %attempts% leq 15 (");
+                sb.AppendLine("        timeout /t 1 /nobreak >nul");
+                sb.AppendLine("        goto retry");
+                sb.AppendLine("    )");
+                sb.AppendLine(")");
+                sb.AppendLine(string.Format("cd /d \"{0}\"", parentDir));
+                sb.AppendLine(string.Format("start \"\" \"{0}\"", currentExePath));
+                sb.AppendLine(string.Format("del /f /q \"{0}\" >nul 2>&1", newExePath));
+                sb.AppendLine("(goto) 2>nul & del \"%~f0\" >nul 2>&1");
 
-                File.WriteAllText(scriptPath, cmd, Encoding.UTF8);
+                File.WriteAllText(scriptPath, sb.ToString(), Encoding.UTF8);
 
                 var psi = new ProcessStartInfo
                 {
                     FileName = "cmd.exe",
-                    Arguments = string.Format("/c \"{0}\"", scriptPath),
+                    Arguments = "/c \"" + scriptPath + "\"",
                     CreateNoWindow = true,
                     WindowStyle = ProcessWindowStyle.Hidden,
-                    UseShellExecute = false
+                    UseShellExecute = true
                 };
 
                 Process.Start(psi);

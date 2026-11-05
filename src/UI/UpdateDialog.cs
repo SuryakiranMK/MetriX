@@ -1,6 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Drawing.Text;
+using System.IO;
+using System.Threading;
 using System.Windows.Forms;
 using MetriX.Model;
 using MetriX.Native;
@@ -16,10 +20,12 @@ namespace MetriX.UI
 
         private Panel _progressPanel;
         private Label _lblProgressStatus;
+        private Panel _pnlBarTrack;
         private int _progressPercent = 0;
         private Button _btnUpdate;
         private Button _btnLater;
         private FluentToggleSwitch _toggleSilent;
+        private FluentChangelogView _changelogView;
 
         public UpdateDialog(UpdateInfo updateInfo, UpdateService updateService, ConfigService configService)
         {
@@ -48,25 +54,67 @@ namespace MetriX.UI
             catch { }
         }
 
+        private static Bitmap GetProductIconBitmap()
+        {
+            try
+            {
+                string exePath = Application.ExecutablePath;
+                if (File.Exists(exePath))
+                {
+                    using (Icon ico = Icon.ExtractAssociatedIcon(exePath))
+                    {
+                        if (ico != null) return new Bitmap(ico.ToBitmap(), 36, 36);
+                    }
+                }
+
+                string icoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.ico");
+                if (File.Exists(icoPath))
+                {
+                    using (Icon ico = new Icon(icoPath, 36, 36))
+                    {
+                        return new Bitmap(ico.ToBitmap(), 36, 36);
+                    }
+                }
+            }
+            catch { }
+
+            // Clean vector fallback if icon file is not found
+            Bitmap bmp = new Bitmap(36, 36);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                using (var brush = new SolidBrush(Color.FromArgb(0, 120, 215)))
+                {
+                    g.FillEllipse(brush, 2, 2, 32, 32);
+                }
+                using (var pen = new Pen(Color.White, 2.5f))
+                {
+                    g.DrawLine(pen, 10, 24, 18, 10);
+                    g.DrawLine(pen, 18, 10, 26, 24);
+                }
+            }
+            return bmp;
+        }
+
         private void InitializeUI()
         {
             Text = "metriX Update Available";
-            Size = new Size(480, 470);
+            Size = new Size(560, 585);
             StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
             ShowInTaskbar = true;
-            BackColor = Color.FromArgb(28, 28, 30);
+            BackColor = Color.FromArgb(24, 24, 28);
             ForeColor = Color.White;
             Font = new Font("Segoe UI Variable Text", 9.0f, FontStyle.Regular);
 
-            // Header Banner
+            // 1. Header Banner
             var headerPanel = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 74,
-                BackColor = Color.FromArgb(34, 34, 38)
+                Height = 76,
+                BackColor = Color.FromArgb(32, 32, 36)
             };
             headerPanel.Paint += (s, e) =>
             {
@@ -76,13 +124,13 @@ namespace MetriX.UI
                 }
             };
 
-            var lblBadge = new Label
+            var picIcon = new PictureBox
             {
-                Text = "⚡",
-                Font = new Font("Segoe UI", 18.0f, FontStyle.Regular),
-                ForeColor = Color.FromArgb(76, 194, 255),
-                Location = new Point(16, 14),
-                AutoSize = true
+                Image = GetProductIconBitmap(),
+                SizeMode = PictureBoxSizeMode.CenterImage,
+                Location = new Point(20, 18),
+                Size = new Size(36, 36),
+                BackColor = Color.Transparent
             };
 
             var lblTitle = new Label
@@ -90,7 +138,7 @@ namespace MetriX.UI
                 Text = string.Format("metriX {0} is available!", _updateInfo.VersionTag),
                 Font = new Font("Segoe UI", 12.0f, FontStyle.Bold),
                 ForeColor = Color.White,
-                Location = new Point(62, 14),
+                Location = new Point(68, 16),
                 AutoSize = true,
                 UseMnemonic = false
             };
@@ -101,77 +149,53 @@ namespace MetriX.UI
 
             var lblSubtitle = new Label
             {
-                Text = string.Format("Current version: v{0} • Released {1}", _updateInfo.CurrentVersion, dateStr),
+                Text = string.Format("Current version: v{0}  •  Released {1}", _updateInfo.CurrentVersion, dateStr),
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(170, 170, 175),
-                Location = new Point(62, 40),
+                Location = new Point(68, 42),
                 AutoSize = true,
                 UseMnemonic = false
             };
 
-            headerPanel.Controls.Add(lblBadge);
+            headerPanel.Controls.Add(picIcon);
             headerPanel.Controls.Add(lblTitle);
             headerPanel.Controls.Add(lblSubtitle);
             Controls.Add(headerPanel);
 
-            int contentW = 432;
+            int contentW = 504;
 
-            // Changelog / Release Highlights Card
-            var cardChangelog = new Panel
-            {
-                Location = new Point(16, 86),
-                Size = new Size(contentW, 185),
-                BackColor = Color.FromArgb(20, 20, 22)
-            };
-            cardChangelog.Paint += (s, e) =>
-            {
-                using (var pen = new Pen(Color.FromArgb(45, 45, 50), 1))
-                {
-                    e.Graphics.DrawRectangle(pen, 0, 0, cardChangelog.Width - 1, cardChangelog.Height - 1);
-                }
-            };
-
+            // 2. Changelog / Release Notes Section
             var lblCardHeader = new Label
             {
                 Text = "WHAT'S NEW IN THIS UPDATE",
                 Font = new Font("Segoe UI", 7.5f, FontStyle.Bold),
-                ForeColor = Color.FromArgb(130, 130, 135),
-                Location = new Point(12, 8),
+                ForeColor = Color.FromArgb(135, 135, 142),
+                Location = new Point(20, 86),
                 AutoSize = true,
                 UseMnemonic = false
             };
+            Controls.Add(lblCardHeader);
 
-            var txtChangelog = new TextBox
+            // Large changelog view dominating majority of window height
+            _changelogView = new FluentChangelogView
             {
-                Multiline = true,
-                ReadOnly = true,
-                ScrollBars = ScrollBars.Vertical,
-                BackColor = Color.FromArgb(20, 20, 22),
-                ForeColor = Color.FromArgb(220, 220, 225),
-                BorderStyle = BorderStyle.None,
-                Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
-                Location = new Point(12, 28),
-                Size = new Size(contentW - 24, 145),
-                Text = CleanChangelogText(_updateInfo.Changelog)
+                Location = new Point(20, 106),
+                Size = new Size(contentW, 280)
             };
-            txtChangelog.GotFocus += (s, e) => { txtChangelog.Select(0, 0); };
-            txtChangelog.MouseDown += (s, e) => { txtChangelog.Select(0, 0); };
+            _changelogView.SetChangelog(_updateInfo.Changelog);
+            Controls.Add(_changelogView);
 
-            cardChangelog.Controls.Add(lblCardHeader);
-            cardChangelog.Controls.Add(txtChangelog);
-            Controls.Add(cardChangelog);
-
-            // Silent Update Opt-In Option
+            // 3. Silent Update Opt-In Option (directly below update notes)
             var pnlOption = new Panel
             {
-                Location = new Point(16, 280),
-                Size = new Size(contentW, 32),
+                Location = new Point(20, 396),
+                Size = new Size(contentW, 30),
                 BackColor = Color.Transparent
             };
 
             _toggleSilent = new FluentToggleSwitch
             {
-                Location = new Point(0, 4),
+                Location = new Point(0, 3),
                 Checked = _configService.Config.EnableSilentAutoUpdate
             };
             _toggleSilent.CheckedChanged += (s, e) =>
@@ -185,9 +209,10 @@ namespace MetriX.UI
                 Text = "Automatically download and install future updates silently",
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(200, 200, 205),
-                Location = new Point(48, 6),
+                Location = new Point(48, 5),
                 AutoSize = true,
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                UseMnemonic = false
             };
             lblSilentDesc.Click += (s, e) => _toggleSilent.Checked = !_toggleSilent.Checked;
 
@@ -195,11 +220,11 @@ namespace MetriX.UI
             pnlOption.Controls.Add(lblSilentDesc);
             Controls.Add(pnlOption);
 
-            // Progress bar panel (hidden initially)
+            // 4. Progress bar panel (hidden until update starts)
             _progressPanel = new Panel
             {
-                Location = new Point(16, 318),
-                Size = new Size(contentW, 38),
+                Location = new Point(20, 434),
+                Size = new Size(contentW, 40),
                 BackColor = Color.Transparent,
                 Visible = false
             };
@@ -211,42 +236,50 @@ namespace MetriX.UI
                 ForeColor = Color.FromArgb(76, 194, 255),
                 Location = new Point(0, 0),
                 Size = new Size(contentW, 18),
-                TextAlign = ContentAlignment.MiddleLeft
+                TextAlign = ContentAlignment.MiddleLeft,
+                UseMnemonic = false
             };
 
-            var pnlBarTrack = new Panel
+            _pnlBarTrack = new Panel
             {
                 Location = new Point(0, 22),
                 Size = new Size(contentW, 8),
-                BackColor = Color.FromArgb(40, 40, 45)
+                BackColor = Color.Transparent
             };
-            pnlBarTrack.Paint += (s, e) =>
+            _pnlBarTrack.Paint += (s, e) =>
             {
                 Graphics g = e.Graphics;
                 g.SmoothingMode = SmoothingMode.AntiAlias;
-                int pw = pnlBarTrack.Width - 1;
-                int ph = pnlBarTrack.Height - 1;
+                int pw = _pnlBarTrack.Width - 1;
+                int ph = _pnlBarTrack.Height - 1;
+
+                using (var trackPath = GetRoundedRect(0, 0, pw, ph, 4))
+                using (var trackBrush = new SolidBrush(Color.FromArgb(40, 40, 46)))
+                {
+                    g.FillPath(trackBrush, trackPath);
+                }
 
                 if (_progressPercent > 0)
                 {
-                    int fillW = Math.Max(4, (int)(pw * Math.Min(1.0f, _progressPercent / 100.0f)));
-                    using (var fillBrush = new SolidBrush(Color.FromArgb(0, 120, 215)))
+                    int fillW = Math.Max(8, (int)(pw * Math.Min(1.0f, _progressPercent / 100.0f)));
+                    using (var fillPath = GetRoundedRect(0, 0, fillW, ph, 4))
+                    using (var fillBrush = new SolidBrush(_progressPercent >= 100 ? Color.FromArgb(108, 203, 95) : Color.FromArgb(0, 120, 215)))
                     {
-                        g.FillRectangle(fillBrush, 0, 0, fillW, ph);
+                        g.FillPath(fillBrush, fillPath);
                     }
                 }
             };
 
             _progressPanel.Controls.Add(_lblProgressStatus);
-            _progressPanel.Controls.Add(pnlBarTrack);
+            _progressPanel.Controls.Add(_pnlBarTrack);
             Controls.Add(_progressPanel);
 
-            // Footer action bar
+            // 5. Footer action bar (Buttons on very right bottom)
             var footerPanel = new Panel
             {
                 Dock = DockStyle.Bottom,
-                Height = 56,
-                BackColor = Color.FromArgb(24, 24, 28)
+                Height = 60,
+                BackColor = Color.FromArgb(20, 20, 24)
             };
             footerPanel.Paint += (s, e) =>
             {
@@ -256,6 +289,23 @@ namespace MetriX.UI
                 }
             };
 
+            _btnLater = new Button
+            {
+                Text = "Remind Later",
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
+                ForeColor = Color.FromArgb(200, 200, 205),
+                BackColor = Color.FromArgb(36, 36, 40),
+                FlatStyle = FlatStyle.Flat,
+                Size = new Size(115, 36),
+                Location = new Point(contentW + 20 - 305, 12),
+                Cursor = Cursors.Hand,
+                UseMnemonic = false,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Padding = Padding.Empty
+            };
+            _btnLater.FlatAppearance.BorderColor = Color.FromArgb(55, 55, 62);
+            _btnLater.Click += (s, e) => Close();
+
             _btnUpdate = new Button
             {
                 Text = "⚡ Download & Install",
@@ -263,8 +313,8 @@ namespace MetriX.UI
                 ForeColor = Color.White,
                 BackColor = Color.FromArgb(0, 120, 215),
                 FlatStyle = FlatStyle.Flat,
-                Size = new Size(170, 34),
-                Location = new Point(278, 11),
+                Size = new Size(180, 36),
+                Location = new Point(contentW + 20 - 180, 12),
                 Cursor = Cursors.Hand,
                 UseMnemonic = false,
                 TextAlign = ContentAlignment.MiddleCenter,
@@ -272,23 +322,6 @@ namespace MetriX.UI
             };
             _btnUpdate.FlatAppearance.BorderSize = 0;
             _btnUpdate.Click += OnStartUpdateClick;
-
-            _btnLater = new Button
-            {
-                Text = "Remind Later",
-                Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
-                ForeColor = Color.FromArgb(200, 200, 205),
-                BackColor = Color.FromArgb(38, 38, 42),
-                FlatStyle = FlatStyle.Flat,
-                Size = new Size(110, 34),
-                Location = new Point(158, 11),
-                Cursor = Cursors.Hand,
-                UseMnemonic = false,
-                TextAlign = ContentAlignment.MiddleCenter,
-                Padding = Padding.Empty
-            };
-            _btnLater.FlatAppearance.BorderColor = Color.FromArgb(55, 55, 60);
-            _btnLater.Click += (s, e) => Close();
 
             footerPanel.Controls.Add(_btnLater);
             footerPanel.Controls.Add(_btnUpdate);
@@ -300,12 +333,15 @@ namespace MetriX.UI
             _btnUpdate.Enabled = false;
             _btnLater.Enabled = false;
             _progressPanel.Visible = true;
+            _progressPercent = 5;
             _lblProgressStatus.Text = "Connecting to GitHub...";
+            _lblProgressStatus.ForeColor = Color.FromArgb(76, 194, 255);
+            _pnlBarTrack.Invalidate();
 
             _updateService.DownloadUpdateAsync(_updateInfo,
                 (percent, received, total) =>
                 {
-                    _progressPercent = percent;
+                    _progressPercent = Math.Max(5, percent);
                     if (total > 0)
                     {
                         double recvMb = received / 1048576.0;
@@ -316,11 +352,11 @@ namespace MetriX.UI
                     {
                         _lblProgressStatus.Text = string.Format("Downloading: {0}%", percent);
                     }
-                    _progressPanel.Controls[1].Invalidate();
+                    _pnlBarTrack.Invalidate();
                 },
                 (readyExePath, err) =>
                 {
-                    if (err != null || string.IsNullOrEmpty(readyExePath))
+                    if (err != null || string.IsNullOrEmpty(readyExePath) || !File.Exists(readyExePath))
                     {
                         _lblProgressStatus.Text = "Update failed: " + (err != null ? err.Message : "Unknown error");
                         _lblProgressStatus.ForeColor = Color.FromArgb(255, 80, 80);
@@ -329,55 +365,235 @@ namespace MetriX.UI
                         return;
                     }
 
+                    // Direct synchronous update & restart (Zero unrooted timers, guaranteed transition)
                     _lblProgressStatus.Text = "Applying update & restarting...";
                     _lblProgressStatus.ForeColor = Color.FromArgb(108, 203, 95);
                     _progressPercent = 100;
-                    _progressPanel.Controls[1].Invalidate();
+                    _pnlBarTrack.Invalidate();
+                    Update();
+                    Application.DoEvents();
+                    Thread.Sleep(350);
 
-                    var restartTimer = new Timer();
-                    restartTimer.Interval = 400;
-                    restartTimer.Tick += (ts, te) =>
-                    {
-                        restartTimer.Stop();
-                        restartTimer.Dispose();
-                        Hide();
-                        UpdateService.ApplyUpdateAndRestart(readyExePath);
-                    };
-                    restartTimer.Start();
+                    Hide();
+                    UpdateService.ApplyUpdateAndRestart(readyExePath);
                 });
         }
 
-        private static string CleanChangelogText(string raw)
+        private static GraphicsPath GetRoundedRect(int x, int y, int width, int height, int radius)
         {
-            if (string.IsNullOrEmpty(raw))
+            GraphicsPath path = new GraphicsPath();
+            int diameter = radius * 2;
+            Rectangle arc = new Rectangle(x, y, diameter, diameter);
+
+            path.AddArc(arc, 180, 90);
+            arc.X = x + width - diameter;
+            path.AddArc(arc, 270, 90);
+            arc.Y = y + height - diameter;
+            path.AddArc(arc, 0, 90);
+            arc.X = x;
+            path.AddArc(arc, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
+    }
+
+    /// <summary>
+    /// Sleek Windows 11 Fluent Changelog View for UpdateDialog.
+    /// Completely replaces classic Win32 white TextBox with anti-aliased dark rendering and Fluent dark scrollbar.
+    /// </summary>
+    public class FluentChangelogView : Panel
+    {
+        private class ChangelogBlock
+        {
+            public string Text;
+            public Font BlockFont;
+            public Color TextColor;
+            public int IndentX;
+            public int Height;
+        }
+
+        private readonly List<ChangelogBlock> _blocks = new List<ChangelogBlock>();
+        private readonly FluentScrollBar _scrollBar;
+        private int _totalContentHeight = 0;
+
+        public FluentChangelogView()
+        {
+            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+            BackColor = Color.FromArgb(18, 18, 22);
+            AutoScroll = false;
+
+            _scrollBar = new FluentScrollBar
             {
-                return "• Performance enhancements and bug fixes.\n• Windows 11 Fluent UI optimizations.";
+                Size = new Size(8, Height - 16),
+                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Right,
+                ViewportSize = Height,
+                Visible = false
+            };
+            _scrollBar.ValueChanged += (s, e) => Invalidate();
+            Controls.Add(_scrollBar);
+        }
+
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            _scrollBar.Location = new Point(Width - 14, 8);
+            _scrollBar.Size = new Size(8, Math.Max(10, Height - 16));
+            _scrollBar.ViewportSize = Height;
+            RecomputeLayout();
+            Invalidate();
+        }
+
+        public void SetChangelog(string rawMarkdown)
+        {
+            _blocks.Clear();
+            if (string.IsNullOrEmpty(rawMarkdown))
+            {
+                rawMarkdown = "• Performance optimizations and stability improvements.\n• Windows 11 Fluent UI visual refinements.";
             }
 
-            // Normalize line breaks
-            string text = raw.Replace("\r\n", "\n").Replace("\r", "\n");
-            var lines = text.Split('\n');
-            var cleanLines = new System.Collections.Generic.List<string>();
+            string text = rawMarkdown.Replace("\r\n", "\n").Replace("\r", "\n");
+            string[] rawLines = text.Split('\n');
 
-            foreach (var l in lines)
+            foreach (string rawLine in rawLines)
             {
-                string trim = l.Trim();
-                if (trim.StartsWith("#"))
-                {
-                    cleanLines.Add(trim.TrimStart('#').Trim().ToUpperInvariant());
-                }
-                else if (trim.StartsWith("---"))
+                string trimmed = rawLine.Trim();
+                if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith("---"))
                 {
                     continue;
                 }
-                else if (!string.IsNullOrEmpty(trim))
+
+                ChangelogBlock block = new ChangelogBlock();
+
+                if (trimmed.StartsWith("# "))
                 {
-                    cleanLines.Add(trim);
+                    block.Text = trimmed.TrimStart('#', ' ');
+                    block.BlockFont = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+                    block.TextColor = Color.FromArgb(76, 194, 255);
+                    block.IndentX = 14;
                 }
+                else if (trimmed.StartsWith("## "))
+                {
+                    block.Text = trimmed.TrimStart('#', ' ');
+                    block.BlockFont = new Font("Segoe UI", 9.0f, FontStyle.Bold);
+                    block.TextColor = Color.White;
+                    block.IndentX = 14;
+                }
+                else if (trimmed.StartsWith("### "))
+                {
+                    block.Text = trimmed.TrimStart('#', ' ');
+                    block.BlockFont = new Font("Segoe UI", 8.5f, FontStyle.Bold);
+                    block.TextColor = Color.FromArgb(170, 210, 255);
+                    block.IndentX = 18;
+                }
+                else if (trimmed.StartsWith("- ") || trimmed.StartsWith("* ") || trimmed.StartsWith("• "))
+                {
+                    block.Text = "•  " + trimmed.Substring(2).Trim();
+                    block.BlockFont = new Font("Segoe UI", 8.5f, FontStyle.Regular);
+                    block.TextColor = Color.FromArgb(220, 220, 225);
+                    block.IndentX = 22;
+                }
+                else if (rawLine.StartsWith("   ") || rawLine.StartsWith("\t"))
+                {
+                    string subTrim = trimmed.TrimStart('-', '*', '•', ' ');
+                    block.Text = "–  " + subTrim;
+                    block.BlockFont = new Font("Segoe UI", 8.25f, FontStyle.Regular);
+                    block.TextColor = Color.FromArgb(170, 170, 178);
+                    block.IndentX = 36;
+                }
+                else
+                {
+                    block.Text = trimmed;
+                    block.BlockFont = new Font("Segoe UI", 8.5f, FontStyle.Regular);
+                    block.TextColor = Color.FromArgb(210, 210, 215);
+                    block.IndentX = 14;
+                }
+
+                _blocks.Add(block);
             }
 
-            return string.Join("\r\n", cleanLines.ToArray());
+            RecomputeLayout();
+            Invalidate();
+        }
+
+        private void RecomputeLayout()
+        {
+            int availW = Math.Max(100, Width - 36);
+            _totalContentHeight = 12;
+
+            foreach (var block in _blocks)
+            {
+                int maxTextW = availW - block.IndentX;
+                Size measured = TextRenderer.MeasureText(block.Text, block.BlockFont, new Size(maxTextW, 0),
+                    TextFormatFlags.WordBreak | TextFormatFlags.Left | TextFormatFlags.NoPrefix);
+                block.Height = Math.Max(18, measured.Height + 5);
+                _totalContentHeight += block.Height;
+            }
+
+            _totalContentHeight += 16;
+            _scrollBar.Maximum = _totalContentHeight;
+            _scrollBar.ViewportSize = Height;
+            _scrollBar.Visible = _totalContentHeight > Height;
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            Graphics g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
+
+            // Draw rounded card border
+            int w = Width - 1;
+            int h = Height - 1;
+            using (var path = GetRoundedRect(0, 0, w, h, 8))
+            using (var pen = new Pen(Color.FromArgb(46, 46, 52), 1))
+            {
+                g.DrawPath(pen, path);
+            }
+
+            // Draw text blocks
+            int clipW = Width - 24;
+            int scrollY = _scrollBar.Visible ? _scrollBar.Value : 0;
+            int curY = 12 - scrollY;
+
+            foreach (var block in _blocks)
+            {
+                if (curY + block.Height >= 0 && curY <= Height)
+                {
+                    Rectangle textRect = new Rectangle(block.IndentX, curY, clipW - block.IndentX, block.Height);
+                    TextRenderer.DrawText(g, block.Text, block.BlockFont, textRect, block.TextColor,
+                        TextFormatFlags.WordBreak | TextFormatFlags.Left | TextFormatFlags.Top | TextFormatFlags.NoPrefix);
+                }
+                curY += block.Height;
+            }
+        }
+
+        protected override void OnMouseWheel(MouseEventArgs e)
+        {
+            base.OnMouseWheel(e);
+            if (_scrollBar.Visible)
+            {
+                int step = (e.Delta / 120) * 44;
+                _scrollBar.Value -= step;
+                Invalidate();
+            }
+        }
+
+        private static GraphicsPath GetRoundedRect(int x, int y, int width, int height, int radius)
+        {
+            GraphicsPath path = new GraphicsPath();
+            int diameter = radius * 2;
+            Rectangle arc = new Rectangle(x, y, diameter, diameter);
+
+            path.AddArc(arc, 180, 90);
+            arc.X = x + width - diameter;
+            path.AddArc(arc, 270, 90);
+            arc.Y = y + height - diameter;
+            path.AddArc(arc, 0, 90);
+            arc.X = x;
+            path.AddArc(arc, 90, 90);
+            path.CloseFigure();
+            return path;
         }
     }
 }
-
