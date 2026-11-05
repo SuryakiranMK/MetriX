@@ -357,7 +357,7 @@ namespace MetriX.UI
 
         public FluentSettingCard(string title, string description, Control actionControl, int cardHeight = 66)
         {
-            Size = new Size(540, cardHeight);
+            Size = new Size(550, cardHeight);
             BackColor = Color.FromArgb(32, 32, 36);
 
             if (actionControl != null)
@@ -368,7 +368,7 @@ namespace MetriX.UI
                 actionControl.BringToFront();
             }
 
-            int maxTextWidth = (actionControl != null) ? (actionControl.Left - 28) : (Width - 32);
+            int maxTextWidth = (actionControl != null) ? (actionControl.Left - 20) : (Width - 32);
             if (maxTextWidth < 180) maxTextWidth = 180;
 
             _lblTitle = new Label
@@ -486,7 +486,7 @@ namespace MetriX.UI
                      ControlStyles.OptimizedDoubleBuffer |
                      ControlStyles.ResizeRedraw, true);
 
-            Size = new Size(240, 30);
+            Size = new Size(280, 30);
             BackColor = Color.FromArgb(36, 36, 40);
             ForeColor = Color.White;
             Font = new Font("Segoe UI", 9.0f, FontStyle.Regular);
@@ -569,7 +569,7 @@ namespace MetriX.UI
 
             // Draw selected text
             string text = (_selectedIndex >= 0 && _selectedIndex < _items.Count) ? _items[_selectedIndex] : "";
-            Rectangle textRect = new Rectangle(10, 0, Math.Max(10, w - 32), h);
+            Rectangle textRect = new Rectangle(10, 0, Math.Max(10, w - 24), h);
             TextRenderer.DrawText(g, text, Font, textRect, ForeColor,
                 TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
 

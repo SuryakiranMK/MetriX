@@ -176,7 +176,7 @@ namespace MetriX.UI
             var pnlSegment = new Panel
             {
                 Size = new Size(184, 32),
-                Location = new Point(96, 7),
+                Location = new Point(106, 7),
                 BackColor = Color.FromArgb(22, 22, 26)
             };
             pnlSegment.Paint += (s, e) =>
@@ -234,45 +234,22 @@ namespace MetriX.UI
 
             var btnClose = new Button
             {
-                Font = new Font("Segoe UI", 9.5f, FontStyle.Regular),
-                ForeColor = Color.FromArgb(190, 190, 195),
+                Text = "✕",
+                Font = new Font("Segoe UI", 10.0f, FontStyle.Regular),
+                ForeColor = Color.FromArgb(180, 180, 185),
                 BackColor = Color.Transparent,
                 FlatStyle = FlatStyle.Flat,
-                Size = new Size(60, 26),
-                Location = new Point(Width - 60 - 12, 10),
+                Size = new Size(46, 46),
+                Location = new Point(Width - 46, 0),
                 Cursor = Cursors.Hand,
-                UseMnemonic = false
+                UseMnemonic = false,
+                TextAlign = ContentAlignment.MiddleCenter
             };
             btnClose.FlatAppearance.BorderSize = 0;
-            bool isCloseHovered = false;
-            btnClose.MouseEnter += (s, e) =>
-            {
-                isCloseHovered = true;
-                btnClose.BackColor = Color.FromArgb(196, 43, 28);
-                btnClose.ForeColor = Color.White;
-                btnClose.Invalidate();
-            };
-            btnClose.MouseLeave += (s, e) =>
-            {
-                isCloseHovered = false;
-                btnClose.BackColor = Color.Transparent;
-                btnClose.ForeColor = Color.FromArgb(190, 190, 195);
-                btnClose.Invalidate();
-            };
-            btnClose.Paint += (s, e) =>
-            {
-                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                if (!isCloseHovered)
-                {
-                    using (var pen = new Pen(Color.FromArgb(50, 50, 56), 1))
-                    using (var path = GetRoundedRect(0, 0, btnClose.Width - 1, btnClose.Height - 1, 4))
-                    {
-                        e.Graphics.DrawPath(pen, path);
-                    }
-                }
-                TextRenderer.DrawText(e.Graphics, "✕", btnClose.Font, btnClose.ClientRectangle, btnClose.ForeColor,
-                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPadding);
-            };
+            btnClose.FlatAppearance.MouseOverBackColor = Color.FromArgb(196, 43, 28);
+            btnClose.FlatAppearance.MouseDownBackColor = Color.FromArgb(180, 35, 20);
+            btnClose.MouseEnter += (s, e) => { btnClose.ForeColor = Color.White; };
+            btnClose.MouseLeave += (s, e) => { btnClose.ForeColor = Color.FromArgb(180, 180, 185); };
             btnClose.Click += (s, e) => Hide();
 
             headerPanel.Controls.Add(lblTitle);

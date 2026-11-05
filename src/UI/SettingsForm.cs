@@ -236,7 +236,7 @@ namespace MetriX.UI
                 Text = "Taskbar Indicator",
                 Font = new Font("Segoe UI", 7.5f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(140, 140, 145),
-                Location = new Point(17, 38),
+                Location = new Point(17, 40),
                 AutoSize = true
             };
             _navRail.Controls.Add(lblBrand);
@@ -414,14 +414,40 @@ namespace MetriX.UI
 
         private Panel CreateScrollablePage(int y, int height)
         {
-            return new Panel
+            var pnl = new Panel
             {
                 Location = new Point(0, y),
                 Size = new Size(585, height),
-                AutoScroll = false,
+                AutoScroll = true,
                 BackColor = Color.Transparent,
                 Visible = false
             };
+            pnl.MouseEnter += (s, e) => { if (!pnl.Focused) pnl.Focus(); };
+            return pnl;
+        }
+
+        private static void AddSettingCard(Panel page, FluentSettingCard card)
+        {
+            page.Controls.Add(card);
+            card.MouseEnter += (s, e) => { if (!page.Focused) page.Focus(); };
+            foreach (Control child in card.Controls)
+            {
+                child.MouseEnter += (s, e) => { if (!page.Focused) page.Focus(); };
+            }
+        }
+
+        protected override void OnMouseWheel(MouseEventArgs e)
+        {
+            base.OnMouseWheel(e);
+            if (_selectedPageIndex >= 0 && _selectedPageIndex < _pages.Count)
+            {
+                var curPage = _pages[_selectedPageIndex];
+                if (curPage != null && curPage.Visible && curPage.AutoScroll)
+                {
+                    int newY = -curPage.AutoScrollPosition.Y - e.Delta;
+                    curPage.AutoScrollPosition = new Point(0, newY);
+                }
+            }
         }
 
         private void BuildPositionCards(Panel page)
@@ -429,7 +455,7 @@ namespace MetriX.UI
             int y = 6;
 
             // Card 1: Taskbar Position
-            _cbPosition = new FluentDropdown { Width = 240 };
+            _cbPosition = new FluentDropdown { Width = 280 };
             _cbPosition.Items.Add("Right (Left of System Tray)");
             _cbPosition.Items.Add("Left (Near Start / Widgets)");
             _cbPosition.Items.Add("Center (Near Running Apps)");
@@ -438,11 +464,11 @@ namespace MetriX.UI
                 _workingConfig.Position = (PositionMode)_cbPosition.SelectedIndex;
                 _previewPanel.Invalidate();
             };
-            page.Controls.Add(new FluentSettingCard("Taskbar Position", "Anchor indicator relative to taskbar shell icons", _cbPosition) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Taskbar Position", "Anchor indicator relative to taskbar shell icons", _cbPosition) { Location = new Point(0, y) });
             y += 72;
 
             // Card 2: Display Layout Mode
-            _cbLayout = new FluentDropdown { Width = 240 };
+            _cbLayout = new FluentDropdown { Width = 280 };
             _cbLayout.Items.Add("Stacked (Two Rows - Clock Height)");
             _cbLayout.Items.Add("Horizontal (Single Row)");
             _cbLayout.SelectedIndexChanged += (s, e) =>
@@ -450,7 +476,7 @@ namespace MetriX.UI
                 _workingConfig.Layout = (LayoutMode)_cbLayout.SelectedIndex;
                 _previewPanel.Invalidate();
             };
-            page.Controls.Add(new FluentSettingCard("Display Layout Mode", "Choose between two-row stacked or single-row display", _cbLayout) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Display Layout Mode", "Choose between two-row stacked or single-row display", _cbLayout) { Location = new Point(0, y) });
             y += 72;
 
             // Card 3: Horizontal Offset X
@@ -460,7 +486,7 @@ namespace MetriX.UI
                 _workingConfig.OffsetX = (int)_stepperOffsetX.Value;
                 _previewPanel.Invalidate();
             };
-            page.Controls.Add(new FluentSettingCard("Fine-tune Horizontal Offset", "Shift meter horizontally along taskbar", _stepperOffsetX) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Fine-tune Horizontal Offset", "Shift meter horizontally along taskbar", _stepperOffsetX) { Location = new Point(0, y) });
             y += 72;
 
             // Card 4: Vertical Offset Y
@@ -470,7 +496,7 @@ namespace MetriX.UI
                 _workingConfig.OffsetY = (int)_stepperOffsetY.Value;
                 _previewPanel.Invalidate();
             };
-            page.Controls.Add(new FluentSettingCard("Fine-tune Vertical Offset", "Adjust vertical baseline centering", _stepperOffsetY) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Fine-tune Vertical Offset", "Adjust vertical baseline centering", _stepperOffsetY) { Location = new Point(0, y) });
             y += 72;
 
             // Card 5: Multi-Monitor Mirroring
@@ -479,7 +505,7 @@ namespace MetriX.UI
             {
                 _workingConfig.ShowOnAllMonitors = _toggleAllMonitors.Checked;
             };
-            page.Controls.Add(new FluentSettingCard("Multi-Monitor Mirroring", "Mirror synchronized indicator on all secondary display taskbars", _toggleAllMonitors) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Multi-Monitor Mirroring", "Mirror synchronized indicator on all secondary display taskbars", _toggleAllMonitors) { Location = new Point(0, y) });
             y += 72;
 
             // Card 6: Detachable Floating Mini-Widget
@@ -488,11 +514,11 @@ namespace MetriX.UI
             {
                 _workingConfig.IsFloatingMode = _toggleFloatingMode.Checked;
             };
-            page.Controls.Add(new FluentSettingCard("Detachable Floating Mini-Widget", "Detach meter from taskbar into a draggable desktop widget", _toggleFloatingMode) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Detachable Floating Mini-Widget", "Detach meter from taskbar into a draggable desktop widget", _toggleFloatingMode) { Location = new Point(0, y) });
             y += 72;
 
             // Card 7: Floating Widget Scale
-            _cbFloatingScale = new FluentDropdown { Width = 240 };
+            _cbFloatingScale = new FluentDropdown { Width = 280 };
             _cbFloatingScale.Items.Add("Compact (80%)");
             _cbFloatingScale.Items.Add("Standard (100%)");
             _cbFloatingScale.Items.Add("Large (125%)");
@@ -508,7 +534,7 @@ namespace MetriX.UI
                 }
                 _previewPanel.Invalidate();
             };
-            page.Controls.Add(new FluentSettingCard("Floating Widget Scale", "Scale sizing of the detached floating mini-widget", _cbFloatingScale) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Floating Widget Scale", "Scale sizing of the detached floating mini-widget", _cbFloatingScale) { Location = new Point(0, y) });
             y += 72;
 
             // Card 8: Lock Floating Position
@@ -517,7 +543,7 @@ namespace MetriX.UI
             {
                 _workingConfig.FloatingLocked = _toggleFloatingLocked.Checked;
             };
-            page.Controls.Add(new FluentSettingCard("Lock Floating Position", "Prevent accidental dragging of the floating widget", _toggleFloatingLocked) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Lock Floating Position", "Prevent accidental dragging of the floating widget", _toggleFloatingLocked) { Location = new Point(0, y) });
             y += 72;
 
             // Card 9: Always on Top (Floating)
@@ -526,8 +552,10 @@ namespace MetriX.UI
             {
                 _workingConfig.FloatingAlwaysOnTop = _toggleFloatingTop.Checked;
             };
-            page.Controls.Add(new FluentSettingCard("Always on Top (Floating)", "Keep floating widget visible above other desktop applications", _toggleFloatingTop) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Always on Top (Floating)", "Keep floating widget visible above other desktop applications", _toggleFloatingTop) { Location = new Point(0, y) });
             y += 72;
+
+            page.AutoScrollMinSize = new Size(0, y + 16);
         }
 
         private void BuildStyleCards(Panel page)
@@ -535,7 +563,7 @@ namespace MetriX.UI
             int y = 6;
 
             // Card 1: Font Family
-            _cbFont = new FluentDropdown { Width = 240 };
+            _cbFont = new FluentDropdown { Width = 280 };
             _cbFont.Items.Add("Segoe UI Variable Text");
             _cbFont.Items.Add("Segoe UI");
             _cbFont.Items.Add("Consolas");
@@ -550,7 +578,7 @@ namespace MetriX.UI
                     _previewPanel.Invalidate();
                 }
             };
-            page.Controls.Add(new FluentSettingCard("Typeface (Font Family)", "Select typeface for telemetry numbers and units", _cbFont) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Typeface (Font Family)", "Select typeface for telemetry numbers and units", _cbFont) { Location = new Point(0, y) });
             y += 72;
 
             // Card 2: Font Size & Bold
@@ -574,7 +602,7 @@ namespace MetriX.UI
             var lblBold = new Label { Text = "Bold", Font = new Font("Segoe UI", 8.5f, FontStyle.Regular), ForeColor = Color.FromArgb(180, 180, 185), Location = new Point(172, 6), AutoSize = true, UseMnemonic = false };
             pnlFontProps.Controls.Add(lblBold);
 
-            page.Controls.Add(new FluentSettingCard("Digits Font Size & Weight", "Configure size (pt) and bold weight for speed numbers", pnlFontProps) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Digits Font Size & Weight", "Configure size (pt) and bold weight for speed numbers", pnlFontProps) { Location = new Point(0, y) });
             y += 72;
 
             // Card 3: Unit Size
@@ -584,7 +612,7 @@ namespace MetriX.UI
                 _workingConfig.UnitFontSize = (float)_stepperUnitFontSize.Value;
                 _previewPanel.Invalidate();
             };
-            page.Controls.Add(new FluentSettingCard("Unit Label Font Size", "Independent font size for KB/s, MB/s unit suffixes", _stepperUnitFontSize) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Unit Label Font Size", "Independent font size for KB/s, MB/s unit suffixes", _stepperUnitFontSize) { Location = new Point(0, y) });
             y += 72;
 
             // Card 4: Auto Theme
@@ -595,7 +623,7 @@ namespace MetriX.UI
                 UpdateColorChipStates();
                 _previewPanel.Invalidate();
             };
-            page.Controls.Add(new FluentSettingCard("Windows Auto-Theme Detection", "Automatically harmonize colors with Dark or Light taskbar", _toggleAutoTheme) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Windows Auto-Theme Detection", "Automatically harmonize colors with Dark or Light taskbar", _toggleAutoTheme) { Location = new Point(0, y) });
             y += 72;
 
             // Card 5: Speed Accent Colors
@@ -608,7 +636,7 @@ namespace MetriX.UI
             pnlColorChips.Controls.Add(_chipDownloadColor);
             pnlColorChips.Controls.Add(_chipLabelColor);
 
-            page.Controls.Add(new FluentSettingCard("Speed Accent Colors", "Upload (▲), Download (▼), and Unit Label colors", pnlColorChips) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Speed Accent Colors", "Upload (▲), Download (▼), and Unit Label colors", pnlColorChips) { Location = new Point(0, y) });
             y += 72;
 
             // Card 6: Color Presets
@@ -622,7 +650,7 @@ namespace MetriX.UI
             pnlPresets.Controls.Add(btnAmber);
             pnlPresets.Controls.Add(btnMono);
 
-            page.Controls.Add(new FluentSettingCard("Color Palette Presets", "One-click harmonious Fluent palettes", pnlPresets) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Color Palette Presets", "One-click harmonious Fluent palettes", pnlPresets) { Location = new Point(0, y) });
             y += 72;
 
             // Card 7: Hover Highlight Pill
@@ -631,8 +659,10 @@ namespace MetriX.UI
             {
                 _workingConfig.ShowHoverHighlight = _toggleHoverHighlight.Checked;
             };
-            page.Controls.Add(new FluentSettingCard("Taskbar Hover Highlight Pill", "Display subtle Windows 11 rounded background pill on cursor hover", _toggleHoverHighlight) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Taskbar Hover Highlight Pill", "Display subtle Windows 11 rounded background pill on cursor hover", _toggleHoverHighlight) { Location = new Point(0, y) });
             y += 72;
+
+            page.AutoScrollMinSize = new Size(0, y + 16);
         }
 
         private void BuildSpacingCards(Panel page)
@@ -640,7 +670,7 @@ namespace MetriX.UI
             int y = 6;
 
             // Card 1: Arrow Glyphs
-            _cbArrowStyle = new FluentDropdown { Width = 240 };
+            _cbArrowStyle = new FluentDropdown { Width = 280 };
             _cbArrowStyle.Items.Add("Triangles (▲ / ▼)");
             _cbArrowStyle.Items.Add("Arrows (↑ / ↓)");
             _cbArrowStyle.Items.Add("Letters (U: / D:)");
@@ -650,11 +680,11 @@ namespace MetriX.UI
                 _workingConfig.ArrowStyle = (ArrowStyle)_cbArrowStyle.SelectedIndex;
                 _previewPanel.Invalidate();
             };
-            page.Controls.Add(new FluentSettingCard("Direction Glyphs", "Choose indicator prefix symbol style", _cbArrowStyle) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Direction Glyphs", "Choose indicator prefix symbol style", _cbArrowStyle) { Location = new Point(0, y) });
             y += 72;
 
             // Card 2: Unit Mode
-            _cbUnitMode = new FluentDropdown { Width = 240 };
+            _cbUnitMode = new FluentDropdown { Width = 280 };
             _cbUnitMode.Items.Add("Auto Bytes (B/s, KB/s, MB/s)");
             _cbUnitMode.Items.Add("Auto Bits (bps, Kbps, Mbps)");
             _cbUnitMode.Items.Add("Fixed KB/s");
@@ -664,7 +694,7 @@ namespace MetriX.UI
                 _workingConfig.UnitMode = (UnitMode)_cbUnitMode.SelectedIndex;
                 _previewPanel.Invalidate();
             };
-            page.Controls.Add(new FluentSettingCard("Bandwidth Unit Mode", "Format data rates in bytes or bits", _cbUnitMode) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Bandwidth Unit Mode", "Format data rates in bytes or bits", _cbUnitMode) { Location = new Point(0, y) });
             y += 72;
 
             // Card 3: Decimal Places
@@ -674,7 +704,7 @@ namespace MetriX.UI
                 _workingConfig.DecimalPlaces = (int)_stepperDecimals.Value;
                 _previewPanel.Invalidate();
             };
-            page.Controls.Add(new FluentSettingCard("Decimal Precision", "Number of fractional decimal places to display", _stepperDecimals) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Decimal Precision", "Number of fractional decimal places to display", _stepperDecimals) { Location = new Point(0, y) });
             y += 72;
 
             // Card 4: Horizontal & Vertical Padding
@@ -695,7 +725,7 @@ namespace MetriX.UI
             };
             pnlPaddings.Controls.Add(_stepperPaddingY);
 
-            page.Controls.Add(new FluentSettingCard("Internal Margin Padding", "Horizontal (X) and vertical (Y) padding around text", pnlPaddings) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Internal Margin Padding", "Horizontal (X) and vertical (Y) padding around text", pnlPaddings) { Location = new Point(0, y) });
             y += 72;
 
             // Card 5: Item Spacing
@@ -705,7 +735,7 @@ namespace MetriX.UI
                 _workingConfig.ItemSpacing = (int)_stepperSpacing.Value;
                 _previewPanel.Invalidate();
             };
-            page.Controls.Add(new FluentSettingCard("Glyph & Item Spacing", "Space between speed readouts and glyph arrows", _stepperSpacing) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Glyph & Item Spacing", "Space between speed readouts and glyph arrows", _stepperSpacing) { Location = new Point(0, y) });
             y += 72;
 
             // Card 6: Overall Opacity
@@ -715,7 +745,7 @@ namespace MetriX.UI
                 _workingConfig.OverallOpacityPercent = (int)_stepperOverallOpacity.Value;
                 _previewPanel.Invalidate();
             };
-            page.Controls.Add(new FluentSettingCard("Overall Meter Opacity", "Configure transparency percentage (30% to 100%)", _stepperOverallOpacity) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Overall Meter Opacity", "Configure transparency percentage (30% to 100%)", _stepperOverallOpacity) { Location = new Point(0, y) });
             y += 72;
 
             // Card 7: Idle Traffic Dimming
@@ -735,8 +765,10 @@ namespace MetriX.UI
             };
             pnlIdle.Controls.Add(_toggleIdleDimming);
 
-            page.Controls.Add(new FluentSettingCard("Idle Bandwidth Dimming", "Dim meter font opacity when traffic drops below 1 KB/s", pnlIdle) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Idle Bandwidth Dimming", "Dim meter font opacity when traffic drops below 1 KB/s", pnlIdle) { Location = new Point(0, y) });
             y += 72;
+
+            page.AutoScrollMinSize = new Size(0, y + 16);
         }
 
         private void BuildSystemCards(Panel page)
@@ -744,7 +776,7 @@ namespace MetriX.UI
             int y = 6;
 
             // Card 1: Network Adapter
-            _cbAdapter = new FluentDropdown { Width = 240 };
+            _cbAdapter = new FluentDropdown { Width = 280 };
             _cbAdapter.Items.Add("All Active Adapters (Aggregated)");
             try
             {
@@ -760,11 +792,11 @@ namespace MetriX.UI
                 if (_cbAdapter.SelectedIndex <= 0) _workingConfig.SelectedAdapterAlias = "";
                 else _workingConfig.SelectedAdapterAlias = _cbAdapter.SelectedItem;
             };
-            page.Controls.Add(new FluentSettingCard("Target Network Interface", "Aggregate all adapters or monitor a single NIC", _cbAdapter) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Target Network Interface", "Aggregate all adapters or monitor a single NIC", _cbAdapter) { Location = new Point(0, y) });
             y += 72;
 
             // Card 2: Sampling Refresh Rate
-            _cbRefreshInterval = new FluentDropdown { Width = 240 };
+            _cbRefreshInterval = new FluentDropdown { Width = 280 };
             _cbRefreshInterval.Items.Add("500 ms (Fast)");
             _cbRefreshInterval.Items.Add("1000 ms (Recommended)");
             _cbRefreshInterval.Items.Add("1500 ms (Balanced)");
@@ -776,11 +808,11 @@ namespace MetriX.UI
                 int idx = _cbRefreshInterval.SelectedIndex;
                 if (idx >= 0 && idx < intervals.Length) _workingConfig.UpdateIntervalMs = intervals[idx];
             };
-            page.Controls.Add(new FluentSettingCard("Telemetry Polling Rate", "Frequency of network kernel table sampling", _cbRefreshInterval) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Telemetry Polling Rate", "Frequency of network kernel table sampling", _cbRefreshInterval) { Location = new Point(0, y) });
             y += 72;
 
             // Card 3: Left-Click Action
-            _cbLeftClickAction = new FluentDropdown { Width = 240 };
+            _cbLeftClickAction = new FluentDropdown { Width = 280 };
             _cbLeftClickAction.Items.Add("Open Taskbar Flyout Popup");
             _cbLeftClickAction.Items.Add("Open Windows Task Manager");
             _cbLeftClickAction.Items.Add("None (Do Nothing)");
@@ -794,7 +826,7 @@ namespace MetriX.UI
                 int idx = _cbLeftClickAction.SelectedIndex;
                 if (idx >= 0 && idx < actions.Length) _workingConfig.LeftClickAction = actions[idx];
             };
-            page.Controls.Add(new FluentSettingCard("Taskbar Left-Click Action", "Action triggered when clicking the meter on your taskbar", _cbLeftClickAction) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Taskbar Left-Click Action", "Action triggered when clicking the meter on your taskbar", _cbLeftClickAction) { Location = new Point(0, y) });
             y += 72;
 
             // Card 4: Monthly Data Quota
@@ -803,7 +835,7 @@ namespace MetriX.UI
             {
                 _workingConfig.MonthlyDataQuotaGb = (double)_stepperDataQuota.Value;
             };
-            page.Controls.Add(new FluentSettingCard("Monthly Data Quota", "Display visual quota usage bar in flyout (0 = Unlimited)", _stepperDataQuota) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Monthly Data Quota", "Display visual quota usage bar in flyout (0 = Unlimited)", _stepperDataQuota) { Location = new Point(0, y) });
             y += 72;
 
             // Card 5: Start with Windows
@@ -812,7 +844,7 @@ namespace MetriX.UI
             {
                 _workingConfig.StartWithWindows = _toggleStartWithWindows.Checked;
             };
-            page.Controls.Add(new FluentSettingCard("Start with Windows", "Automatically launch metriX when you log in", _toggleStartWithWindows) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Start with Windows", "Automatically launch metriX when you log in", _toggleStartWithWindows) { Location = new Point(0, y) });
             y += 72;
 
             // Card 6: Application Updates
@@ -823,13 +855,14 @@ namespace MetriX.UI
                 ForeColor = Color.White,
                 BackColor = Color.FromArgb(0, 120, 215),
                 FlatStyle = FlatStyle.Flat,
-                Size = new Size(130, 28),
+                Size = new Size(150, 30),
                 Cursor = Cursors.Hand,
-                UseMnemonic = false
+                UseMnemonic = false,
+                TextAlign = ContentAlignment.MiddleCenter
             };
             btnCheckUpdates.FlatAppearance.BorderSize = 0;
 
-            var cardUpdates = new FluentSettingCard("Application Updates", "metriX v3.1.1 • Up to date", btnCheckUpdates) { Location = new Point(0, y) };
+            var cardUpdates = new FluentSettingCard("Application Updates", "metriX v3.1.2 • Up to date", btnCheckUpdates) { Location = new Point(0, y) };
             btnCheckUpdates.Click += (s, e) =>
             {
                 if (_updateService == null) return;
@@ -855,7 +888,7 @@ namespace MetriX.UI
                     }
                 });
             };
-            page.Controls.Add(cardUpdates);
+            AddSettingCard(page, cardUpdates);
             y += 72;
 
             // Card 7: Silent Auto-Update
@@ -864,8 +897,10 @@ namespace MetriX.UI
             {
                 _workingConfig.EnableSilentAutoUpdate = _toggleSilentUpdate.Checked;
             };
-            page.Controls.Add(new FluentSettingCard("Silent Auto-Update", "Automatically download and apply updates without prompting", _toggleSilentUpdate) { Location = new Point(0, y) });
+            AddSettingCard(page, new FluentSettingCard("Silent Auto-Update", "Automatically download and apply updates without prompting", _toggleSilentUpdate) { Location = new Point(0, y) });
             y += 72;
+
+            page.AutoScrollMinSize = new Size(0, y + 16);
         }
 
         private Panel CreateColorChip(int x, int width, string label, Action<string> onColorPicked)
