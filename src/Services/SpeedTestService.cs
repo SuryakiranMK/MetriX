@@ -31,11 +31,12 @@ namespace MetriX.Services
     public class SpeedTestService
     {
         private const string HistoryFileName = "speedtest_history.json";
-        private const string DownloadEndpoint = "https://speed.cloudflare.com/__down?bytes=25000000"; // 25 MB stream
+        private const string DownloadEndpoint = "https://speed.cloudflare.com/__down?bytes=50000000"; // 50 MB stream
         private const string UploadEndpoint = "https://speed.cloudflare.com/__up";
 
         private Thread _workerThread;
         private volatile bool _isCancelled;
+        private int _testDurationSeconds = 10;
 
         public bool IsRunning { get; private set; }
 
@@ -53,9 +54,13 @@ namespace MetriX.Services
             catch { }
         }
 
-        public void StartTest()
+        public void StartTest(int durationSeconds = 10)
         {
             if (IsRunning) return;
+
+            if (durationSeconds < 3) durationSeconds = 5;
+            if (durationSeconds > 60) durationSeconds = 60;
+            _testDurationSeconds = durationSeconds;
 
             IsRunning = true;
             _isCancelled = false;
@@ -92,19 +97,19 @@ namespace MetriX.Services
                 NotifyProgress(SpeedTestPhase.Ping, pingMs, string.Format("Ping: {0:F0} ms  |  Jitter: {1:F1} ms", pingMs, jitterMs));
                 Thread.Sleep(300);
 
-                // Phase 2: Download Speed
+                // Phase 2: Download Speed Assessment (Sustained multi-chunk duration testing)
                 if (_isCancelled) { NotifyCancelled(); return; }
-                NotifyProgress(SpeedTestPhase.Download, 0, "Testing download speed...");
-                double downloadMbps = MeasureDownloadSpeed();
+                NotifyProgress(SpeedTestPhase.Download, 0, string.Format("Assessing download speed ({0}s)...", _testDurationSeconds));
+                double downloadMbps = MeasureDownloadSpeed(_testDurationSeconds);
 
                 if (_isCancelled) { NotifyCancelled(); return; }
                 NotifyProgress(SpeedTestPhase.Download, downloadMbps, string.Format("Download: {0:F1} Mbps", downloadMbps));
                 Thread.Sleep(300);
 
-                // Phase 3: Upload Speed
+                // Phase 3: Upload Speed Assessment (Sustained multi-chunk duration testing)
                 if (_isCancelled) { NotifyCancelled(); return; }
-                NotifyProgress(SpeedTestPhase.Upload, 0, "Testing upload speed...");
-                double uploadMbps = MeasureUploadSpeed();
+                NotifyProgress(SpeedTestPhase.Upload, 0, string.Format("Assessing upload speed ({0}s)...", _testDurationSeconds));
+                double uploadMbps = MeasureUploadSpeed(_testDurationSeconds);
 
                 if (_isCancelled) { NotifyCancelled(); return; }
 
@@ -166,7 +171,7 @@ namespace MetriX.Services
                         }
                     }
                     catch { }
-                    Thread.Sleep(100);
+                    Thread.Sleep(80);
                 }
             }
 
@@ -190,51 +195,58 @@ namespace MetriX.Services
             return true;
         }
 
-        private double MeasureDownloadSpeed()
+        private double MeasureDownloadSpeed(int targetDurationSec)
         {
             long totalBytesRead = 0;
             Stopwatch sw = Stopwatch.StartNew();
             long lastReportTicks = 0;
             double peakMbps = 0;
+            long targetDurationMs = (long)targetDurationSec * 1000L;
 
-            try
+            byte[] buffer = new byte[65536]; // 64 KB buffer
+
+            // Loop requests if needed until the full target duration is reached
+            while (sw.ElapsedMilliseconds < targetDurationMs && !_isCancelled)
             {
-                HttpWebRequest req = (HttpWebRequest)WebRequest.Create(DownloadEndpoint);
-                req.Method = "GET";
-                req.Timeout = 8000;
-                req.ReadWriteTimeout = 8000;
-                req.UserAgent = "metriX-SpeedTest/1.2";
-
-                using (HttpWebResponse resp = (HttpWebResponse)req.GetResponse())
-                using (Stream stream = resp.GetResponseStream())
+                try
                 {
-                    byte[] buffer = new byte[65536]; // 64 KB buffer
-                    int bytesRead;
+                    HttpWebRequest req = (HttpWebRequest)WebRequest.Create(DownloadEndpoint);
+                    req.Method = "GET";
+                    req.Timeout = 12000;
+                    req.ReadWriteTimeout = 12000;
+                    req.UserAgent = "metriX-SpeedTest/3.3";
 
-                    // Stream for up to 6 seconds or until payload completes
-                    while ((bytesRead = stream.Read(buffer, 0, buffer.Length)) > 0)
+                    using (HttpWebResponse resp = (HttpWebResponse)req.GetResponse())
+                    using (Stream stream = resp.GetResponseStream())
                     {
-                        if (_isCancelled) break;
-                        totalBytesRead += bytesRead;
-
-                        long elapsedMs = sw.ElapsedMilliseconds;
-                        if (elapsedMs >= 6000) break; // 6-second sample window
-
-                        if (elapsedMs - lastReportTicks >= 120 && elapsedMs > 0)
+                        int bytesRead;
+                        while ((bytesRead = stream.Read(buffer, 0, buffer.Length)) > 0)
                         {
-                            double currentSpeedBps = (totalBytesRead * 8.0) / (elapsedMs / 1000.0);
-                            double currentMbps = currentSpeedBps / 1000000.0;
-                            if (currentMbps > peakMbps) peakMbps = currentMbps;
+                            if (_isCancelled) break;
+                            totalBytesRead += bytesRead;
 
-                            NotifyProgress(SpeedTestPhase.Download, currentMbps,
-                                string.Format("Download: {0:F1} Mbps", currentMbps));
-                            lastReportTicks = elapsedMs;
+                            long elapsedMs = sw.ElapsedMilliseconds;
+                            if (elapsedMs >= targetDurationMs) break;
+
+                            if (elapsedMs - lastReportTicks >= 100 && elapsedMs > 0)
+                            {
+                                double currentSpeedBps = (totalBytesRead * 8.0) / (elapsedMs / 1000.0);
+                                double currentMbps = currentSpeedBps / 1000000.0;
+                                if (currentMbps > peakMbps) peakMbps = currentMbps;
+
+                                int remainingSec = Math.Max(0, (int)Math.Ceiling((targetDurationMs - elapsedMs) / 1000.0));
+                                NotifyProgress(SpeedTestPhase.Download, currentMbps,
+                                    string.Format("Assessing download... ({0}s remaining) - {1:F1} Mbps", remainingSec, currentMbps));
+                                lastReportTicks = elapsedMs;
+                            }
                         }
                     }
                 }
-            }
-            catch
-            {
+                catch
+                {
+                    if (totalBytesRead > 0) break; // if some data was read, compute from what we have
+                    Thread.Sleep(100);
+                }
             }
 
             sw.Stop();
@@ -243,58 +255,65 @@ namespace MetriX.Services
             return Math.Max(avgMbps, peakMbps * 0.9);
         }
 
-        private double MeasureUploadSpeed()
+        private double MeasureUploadSpeed(int targetDurationSec)
         {
             long totalBytesSent = 0;
             Stopwatch sw = Stopwatch.StartNew();
             long lastReportTicks = 0;
             double peakMbps = 0;
+            long targetDurationMs = (long)targetDurationSec * 1000L;
 
             // 4 MB payload chunk
             int chunkSize = 1024 * 1024 * 4;
             byte[] dummyData = new byte[chunkSize];
 
-            try
+            while (sw.ElapsedMilliseconds < targetDurationMs && !_isCancelled)
             {
-                HttpWebRequest req = (HttpWebRequest)WebRequest.Create(UploadEndpoint);
-                req.Method = "POST";
-                req.Timeout = 8000;
-                req.ReadWriteTimeout = 8000;
-                req.ContentType = "application/octet-stream";
-                req.ContentLength = dummyData.Length;
-                req.UserAgent = "metriX-SpeedTest/1.2";
-
-                using (Stream reqStream = req.GetRequestStream())
+                try
                 {
-                    int offset = 0;
-                    int writeChunk = 32768; // 32 KB blocks
+                    HttpWebRequest req = (HttpWebRequest)WebRequest.Create(UploadEndpoint);
+                    req.Method = "POST";
+                    req.Timeout = 12000;
+                    req.ReadWriteTimeout = 12000;
+                    req.ContentType = "application/octet-stream";
+                    req.ContentLength = dummyData.Length;
+                    req.UserAgent = "metriX-SpeedTest/3.3";
 
-                    while (offset < dummyData.Length)
+                    using (Stream reqStream = req.GetRequestStream())
                     {
-                        if (_isCancelled) break;
-                        int toWrite = Math.Min(writeChunk, dummyData.Length - offset);
-                        reqStream.Write(dummyData, offset, toWrite);
-                        offset += toWrite;
-                        totalBytesSent += toWrite;
+                        int offset = 0;
+                        int writeChunk = 32768; // 32 KB blocks
 
-                        long elapsedMs = sw.ElapsedMilliseconds;
-                        if (elapsedMs >= 5000) break; // 5-second sample window
-
-                        if (elapsedMs - lastReportTicks >= 120 && elapsedMs > 0)
+                        while (offset < dummyData.Length)
                         {
-                            double currentSpeedBps = (totalBytesSent * 8.0) / (elapsedMs / 1000.0);
-                            double currentMbps = currentSpeedBps / 1000000.0;
-                            if (currentMbps > peakMbps) peakMbps = currentMbps;
+                            if (_isCancelled) break;
+                            int toWrite = Math.Min(writeChunk, dummyData.Length - offset);
+                            reqStream.Write(dummyData, offset, toWrite);
+                            offset += toWrite;
+                            totalBytesSent += toWrite;
 
-                            NotifyProgress(SpeedTestPhase.Upload, currentMbps,
-                                string.Format("Upload: {0:F1} Mbps", currentMbps));
-                            lastReportTicks = elapsedMs;
+                            long elapsedMs = sw.ElapsedMilliseconds;
+                            if (elapsedMs >= targetDurationMs) break;
+
+                            if (elapsedMs - lastReportTicks >= 100 && elapsedMs > 0)
+                            {
+                                double currentSpeedBps = (totalBytesSent * 8.0) / (elapsedMs / 1000.0);
+                                double currentMbps = currentSpeedBps / 1000000.0;
+                                if (currentMbps > peakMbps) peakMbps = currentMbps;
+
+                                int remainingSec = Math.Max(0, (int)Math.Ceiling((targetDurationMs - elapsedMs) / 1000.0));
+                                NotifyProgress(SpeedTestPhase.Upload, currentMbps,
+                                    string.Format("Assessing upload... ({0}s remaining) - {1:F1} Mbps", remainingSec, currentMbps));
+                                lastReportTicks = elapsedMs;
+                            }
                         }
                     }
                 }
-            }
-            catch
-            {
+                catch
+                {
+                    if (totalBytesSent > 0) break;
+                    Thread.Sleep(100);
+                }
             }
 
             sw.Stop();
@@ -418,4 +437,3 @@ namespace MetriX.Services
         }
     }
 }
-

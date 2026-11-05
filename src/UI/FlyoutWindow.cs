@@ -49,6 +49,9 @@ namespace MetriX.UI
         private Label _lblQuotaStats;
         private Panel _quotaProgressBar;
         private float _quotaPercent = 0f;
+        private Panel _cardSession;
+        private Panel _monitorContentPanel;
+        private FluentScrollBar _monitorScrollBar;
         private DoubleBufferedPanel _pnlTopApps;
         private List<AppNetworkUsage> _currentTopApps = new List<AppNetworkUsage>();
         private Button _btn30s;
@@ -77,6 +80,10 @@ namespace MetriX.UI
         private Label _lblTestDownload;
         private Label _lblTestUpload;
         private Label _lblTestHistory;
+        private Button _btnDur5s;
+        private Button _btnDur10s;
+        private Button _btnDur15s;
+        private Button _btnDur30s;
 
         // Speed Test Live State
         private SpeedTestPhase _currentPhase = SpeedTestPhase.Idle;
@@ -145,7 +152,7 @@ namespace MetriX.UI
         private void InitializeUI()
         {
             Width = 390;
-            Height = 540;
+            Height = 565;
 
             // Header bar
             var headerPanel = new Panel
@@ -261,7 +268,7 @@ namespace MetriX.UI
             _panelMonitor = new Panel
             {
                 Location = new Point(0, 46),
-                Size = new Size(Width, 444),
+                Size = new Size(Width, 469),
                 BackColor = Color.FromArgb(28, 28, 30)
             };
             BuildMonitorView(_panelMonitor);
@@ -271,7 +278,7 @@ namespace MetriX.UI
             _panelSpeedTest = new Panel
             {
                 Location = new Point(0, 46),
-                Size = new Size(Width, 444),
+                Size = new Size(Width, 469),
                 BackColor = Color.FromArgb(28, 28, 30),
                 Visible = false
             };
@@ -398,6 +405,27 @@ namespace MetriX.UI
         {
             int w = container.Width - 28; // 362px at 390 width
 
+            _monitorContentPanel = new Panel
+            {
+                Location = new Point(0, 0),
+                Size = new Size(container.Width, container.Height),
+                BackColor = Color.Transparent,
+                AutoScroll = false
+            };
+
+            _monitorScrollBar = new FluentScrollBar
+            {
+                Location = new Point(container.Width - 10, 4),
+                Size = new Size(8, container.Height - 8),
+                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Right,
+                ViewportSize = container.Height,
+                Visible = false
+            };
+            _monitorScrollBar.ValueChanged += (s, e) =>
+            {
+                _monitorContentPanel.Top = -_monitorScrollBar.Value;
+            };
+
             // Timeframe selection buttons
             int btnY = 6;
             _btn30s = CreateTimeframeButton("30s", 30, 14, btnY);
@@ -405,9 +433,9 @@ namespace MetriX.UI
             _btn5m = CreateTimeframeButton("5m", 300, 98, btnY);
             UpdateTimeframeButtons();
 
-            container.Controls.Add(_btn30s);
-            container.Controls.Add(_btn60s);
-            container.Controls.Add(_btn5m);
+            _monitorContentPanel.Controls.Add(_btn30s);
+            _monitorContentPanel.Controls.Add(_btn60s);
+            _monitorContentPanel.Controls.Add(_btn5m);
 
             // Live rate indicators right of timeframe buttons
             _lblDownloadStats = new Label
@@ -428,8 +456,8 @@ namespace MetriX.UI
                 AutoSize = true,
                 UseMnemonic = false
             };
-            container.Controls.Add(_lblDownloadStats);
-            container.Controls.Add(_lblUploadStats);
+            _monitorContentPanel.Controls.Add(_lblDownloadStats);
+            _monitorContentPanel.Controls.Add(_lblUploadStats);
 
             // Interactive Graph Canvas (DoubleBuffered to eliminate hover flicker)
             _graphPanel = new DoubleBufferedPanel
@@ -457,7 +485,7 @@ namespace MetriX.UI
                 _hoverMouseY = -1;
                 _graphPanel.Invalidate();
             };
-            container.Controls.Add(_graphPanel);
+            _monitorContentPanel.Controls.Add(_graphPanel);
 
             // Card 1: Data Used Till Now (Today / This Week / This Month)
             int usageY = 174;
@@ -567,22 +595,22 @@ namespace MetriX.UI
             cardUsage.Controls.Add(_lblUsageWeekSub);
             cardUsage.Controls.Add(_lblUsageMonthVal);
             cardUsage.Controls.Add(_lblUsageMonthSub);
-            container.Controls.Add(cardUsage);
+            _monitorContentPanel.Controls.Add(cardUsage);
 
             // Card 2: Active Connection & Session Telemetry
-            int cardY = 250;
-            var cardSession = new Panel
+            int cardY = 256;
+            _cardSession = new Panel
             {
                 Location = new Point(14, cardY),
-                Size = new Size(w, 188),
+                Size = new Size(w, 200),
                 BackColor = Color.FromArgb(34, 34, 38),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
-            cardSession.Paint += (s, e) =>
+            _cardSession.Paint += (s, e) =>
             {
                 using (var pen = new Pen(Color.FromArgb(48, 48, 54), 1))
                 {
-                    e.Graphics.DrawRectangle(pen, 0, 0, cardSession.Width - 1, cardSession.Height - 1);
+                    e.Graphics.DrawRectangle(pen, 0, 0, _cardSession.Width - 1, _cardSession.Height - 1);
                 }
             };
 
@@ -663,19 +691,69 @@ namespace MetriX.UI
             _pnlTopApps = new DoubleBufferedPanel
             {
                 Location = new Point(10, 78),
-                Size = new Size(w - 20, 104),
+                Size = new Size(w - 20, 126),
                 BackColor = Color.Transparent,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
             _pnlTopApps.Paint += OnTopAppsPaint;
 
-            cardSession.Controls.Add(lblCardTitle);
-            cardSession.Controls.Add(_lblAdapterInfo);
-            cardSession.Controls.Add(_lblSessionTotals);
-            cardSession.Controls.Add(_lblQuotaStats);
-            cardSession.Controls.Add(_quotaProgressBar);
-            cardSession.Controls.Add(_pnlTopApps);
-            container.Controls.Add(cardSession);
+            _cardSession.Controls.Add(lblCardTitle);
+            _cardSession.Controls.Add(_lblAdapterInfo);
+            _cardSession.Controls.Add(_lblSessionTotals);
+            _cardSession.Controls.Add(_lblQuotaStats);
+            _cardSession.Controls.Add(_quotaProgressBar);
+            _cardSession.Controls.Add(_pnlTopApps);
+            _monitorContentPanel.Controls.Add(_cardSession);
+
+            container.Controls.Add(_monitorContentPanel);
+            container.Controls.Add(_monitorScrollBar);
+
+            AttachMouseWheelEvents(_monitorContentPanel);
+        }
+
+        private void AttachMouseWheelEvents(Control parent)
+        {
+            if (parent == null) return;
+            parent.MouseWheel += OnMonitorMouseWheel;
+            foreach (Control child in parent.Controls)
+            {
+                child.MouseWheel += OnMonitorMouseWheel;
+                AttachMouseWheelEvents(child);
+            }
+        }
+
+        private void OnMonitorMouseWheel(object sender, MouseEventArgs e)
+        {
+            if (_monitorScrollBar != null && _monitorScrollBar.Visible)
+            {
+                int step = (e.Delta / 120) * 44;
+                _monitorScrollBar.Value -= step;
+            }
+        }
+
+        private void UpdateMonitorLayout()
+        {
+            if (_pnlTopApps == null || _cardSession == null || _monitorContentPanel == null || _panelMonitor == null) return;
+
+            int configuredLimit = _configService.Config.TopAppsLimit;
+            int maxDisplay = configuredLimit <= 0 ? _currentTopApps.Count : configuredLimit;
+            int count = Math.Min(maxDisplay, _currentTopApps.Count);
+
+            int rowH = 20;
+            int gap = 2;
+            int neededTopAppsH = 16 + Math.Max(1, count) * (rowH + gap) + 4;
+            _pnlTopApps.Height = neededTopAppsH;
+            _cardSession.Height = 78 + neededTopAppsH + 8;
+
+            int totalH = _cardSession.Bottom + 14;
+            _monitorContentPanel.Height = Math.Max(_panelMonitor.Height, totalH);
+
+            if (_monitorScrollBar != null)
+            {
+                _monitorScrollBar.Maximum = totalH;
+                _monitorScrollBar.ViewportSize = _panelMonitor.Height;
+                _monitorScrollBar.Visible = totalH > _panelMonitor.Height;
+            }
         }
 
         private void BuildSpeedTestView(Panel container)
@@ -700,7 +778,7 @@ namespace MetriX.UI
                 Font = new Font("Segoe UI", 8.0f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(180, 180, 180),
                 TextAlign = ContentAlignment.MiddleCenter,
-                Location = new Point(14, 152),
+                Location = new Point(14, 150),
                 Size = new Size(w, 18),
                 UseMnemonic = false,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
@@ -710,8 +788,8 @@ namespace MetriX.UI
             // 3 Metrics Badges Card
             var cardMetrics = new Panel
             {
-                Location = new Point(14, 174),
-                Size = new Size(w, 52),
+                Location = new Point(14, 170),
+                Size = new Size(w, 48),
                 BackColor = Color.FromArgb(34, 34, 38),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
@@ -731,8 +809,8 @@ namespace MetriX.UI
                 Font = new Font("Segoe UI", 8.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(220, 220, 220),
                 TextAlign = ContentAlignment.MiddleCenter,
-                Location = new Point(6, 6),
-                Size = new Size(badgeW - 12, 40),
+                Location = new Point(6, 4),
+                Size = new Size(badgeW - 12, 38),
                 UseMnemonic = false
             };
 
@@ -742,8 +820,8 @@ namespace MetriX.UI
                 Font = new Font("Segoe UI", 8.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(76, 194, 255),
                 TextAlign = ContentAlignment.MiddleCenter,
-                Location = new Point(badgeW + 6, 6),
-                Size = new Size(badgeW - 12, 40),
+                Location = new Point(badgeW + 6, 4),
+                Size = new Size(badgeW - 12, 38),
                 UseMnemonic = false
             };
 
@@ -753,8 +831,8 @@ namespace MetriX.UI
                 Font = new Font("Segoe UI", 8.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(108, 203, 95),
                 TextAlign = ContentAlignment.MiddleCenter,
-                Location = new Point((badgeW * 2) + 6, 6),
-                Size = new Size(badgeW - 12, 40),
+                Location = new Point((badgeW * 2) + 6, 4),
+                Size = new Size(badgeW - 12, 38),
                 UseMnemonic = false
             };
 
@@ -762,6 +840,43 @@ namespace MetriX.UI
             cardMetrics.Controls.Add(_lblTestDownload);
             cardMetrics.Controls.Add(_lblTestUpload);
             container.Controls.Add(cardMetrics);
+
+            // Duration Selector Capsule Pills
+            var pnlDuration = new Panel
+            {
+                Location = new Point(14, 222),
+                Size = new Size(w, 28),
+                BackColor = Color.Transparent,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+
+            var lblDurTitle = new Label
+            {
+                Text = "DURATION:",
+                Font = new Font("Segoe UI", 7.0f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(150, 150, 155),
+                Location = new Point(4, 7),
+                AutoSize = true,
+                UseMnemonic = false
+            };
+            pnlDuration.Controls.Add(lblDurTitle);
+
+            int pillW = 54;
+            int pillGap = 6;
+            int startPillX = 100;
+
+            _btnDur5s = CreateDurationButton("5s", 5, startPillX, 2, pillW);
+            _btnDur10s = CreateDurationButton("10s", 10, startPillX + pillW + pillGap, 2, pillW);
+            _btnDur15s = CreateDurationButton("15s", 15, startPillX + (pillW + pillGap) * 2, 2, pillW);
+            _btnDur30s = CreateDurationButton("30s", 30, startPillX + (pillW + pillGap) * 3, 2, pillW);
+
+            UpdateDurationButtons();
+
+            pnlDuration.Controls.Add(_btnDur5s);
+            pnlDuration.Controls.Add(_btnDur10s);
+            pnlDuration.Controls.Add(_btnDur15s);
+            pnlDuration.Controls.Add(_btnDur30s);
+            container.Controls.Add(pnlDuration);
 
             // Start / Cancel Test Button
             _btnStartSpeedTest = new Button
@@ -772,7 +887,7 @@ namespace MetriX.UI
                 BackColor = Color.FromArgb(0, 120, 215),
                 FlatStyle = FlatStyle.Flat,
                 Size = new Size(w, 34),
-                Location = new Point(14, 232),
+                Location = new Point(14, 254),
                 Cursor = Cursors.Hand,
                 UseMnemonic = false,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
@@ -784,10 +899,10 @@ namespace MetriX.UI
             // Recent Benchmark History Card - EXPANDED TO FILL VIEWPORT
             var cardHistory = new Panel
             {
-                Location = new Point(14, 274),
-                Size = new Size(w, 162),
+                Location = new Point(14, 296),
+                Size = new Size(w, container.Height - 296 - 10),
                 BackColor = Color.FromArgb(34, 34, 38),
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom
             };
             cardHistory.Paint += (s, e) =>
             {
@@ -814,13 +929,63 @@ namespace MetriX.UI
                 ForeColor = Color.FromArgb(160, 160, 165),
                 TextAlign = ContentAlignment.TopLeft,
                 Location = new Point(10, 26),
-                Size = new Size(w - 20, 128),
+                Size = new Size(w - 20, Math.Max(50, cardHistory.Height - 34)),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
                 UseMnemonic = false
             };
 
             cardHistory.Controls.Add(lblHistTitle);
             cardHistory.Controls.Add(_lblTestHistory);
             container.Controls.Add(cardHistory);
+        }
+
+        private Button CreateDurationButton(string text, int durationSec, int x, int y, int width)
+        {
+            var btn = new Button
+            {
+                Text = text,
+                Tag = durationSec,
+                Font = new Font("Segoe UI", 7.5f, FontStyle.Bold),
+                Size = new Size(width, 24),
+                Location = new Point(x, y),
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand,
+                UseMnemonic = false
+            };
+            btn.FlatAppearance.BorderSize = 0;
+            btn.Click += (s, e) =>
+            {
+                if (_speedTestService.IsRunning) return;
+                _configService.Config.SpeedTestDurationSeconds = durationSec;
+                _configService.Save();
+                UpdateDurationButtons();
+            };
+            return btn;
+        }
+
+        private void UpdateDurationButtons()
+        {
+            int current = _configService.Config.SpeedTestDurationSeconds;
+            if (current <= 0) current = 10;
+            UpdateButtonState(_btnDur5s, current == 5);
+            UpdateButtonState(_btnDur10s, current == 10);
+            UpdateButtonState(_btnDur15s, current == 15);
+            UpdateButtonState(_btnDur30s, current == 30);
+        }
+
+        private static void UpdateButtonState(Button btn, bool isSelected)
+        {
+            if (btn == null) return;
+            if (isSelected)
+            {
+                btn.BackColor = Color.FromArgb(0, 120, 215);
+                btn.ForeColor = Color.White;
+            }
+            else
+            {
+                btn.BackColor = Color.FromArgb(42, 42, 48);
+                btn.ForeColor = Color.FromArgb(180, 180, 185);
+            }
         }
 
         private void OnStartOrCancelSpeedTest(object sender, EventArgs e)
@@ -844,7 +1009,9 @@ namespace MetriX.UI
                 _lblSpeedTestStatus.Text = "Connecting to CDN test node...";
                 _gaugePanel.Invalidate();
 
-                _speedTestService.StartTest();
+                int duration = _configService.Config.SpeedTestDurationSeconds;
+                if (duration <= 0) duration = 10;
+                _speedTestService.StartTest(duration);
             }
         }
 
@@ -1113,11 +1280,11 @@ namespace MetriX.UI
 
             float dpi = DpiHelper.GetDpiScale(Handle);
             int w = DpiHelper.Scale(390, dpi);
-            int h = DpiHelper.Scale(540, dpi);
+            int h = DpiHelper.Scale(565, dpi);
             Size = new Size(w, h);
 
             int contentW = ClientSize.Width;
-            int contentH = ClientSize.Height - 44 - 50;
+            int contentH = ClientSize.Height - 46 - 50;
             if (_panelMonitor != null) _panelMonitor.Size = new Size(contentW, contentH);
             if (_panelSpeedTest != null) _panelSpeedTest.Size = new Size(contentW, contentH);
 
@@ -1219,13 +1386,15 @@ namespace MetriX.UI
             // Active network processes attribution
             try
             {
-                var topApps = _processTracker.GetTopActiveApps(4);
+                int configuredLimit = _configService.Config.TopAppsLimit;
+                var topApps = _processTracker.GetTopActiveApps(configuredLimit <= 0 ? 50 : configuredLimit);
                 _currentTopApps = topApps ?? new List<AppNetworkUsage>();
             }
             catch
             {
                 _currentTopApps = new List<AppNetworkUsage>();
             }
+            UpdateMonitorLayout();
             if (_pnlTopApps != null) _pnlTopApps.Invalidate();
 
             if (_panelMonitor.Visible)
@@ -1262,10 +1431,13 @@ namespace MetriX.UI
                 return;
             }
 
-            int count = Math.Min(4, _currentTopApps.Count);
-            int totalConns = 0;
-            for (int j = 0; j < count; j++) totalConns += _currentTopApps[j].ActiveConnections;
-            if (totalConns <= 0) totalConns = 1;
+            int configuredLimit = _configService.Config.TopAppsLimit;
+            int maxDisplay = configuredLimit <= 0 ? _currentTopApps.Count : configuredLimit;
+            int count = Math.Min(maxDisplay, _currentTopApps.Count);
+
+            double totalWeight = 0;
+            for (int j = 0; j < count; j++) totalWeight += _currentTopApps[j].AttributionWeight;
+            if (totalWeight <= 0) totalWeight = 1.0;
 
             var stats = _networkMonitor != null ? _networkMonitor.CurrentStats : null;
             double totalBandwidth = stats != null ? (stats.DownloadSpeedBytesPerSec + stats.UploadSpeedBytesPerSec) : 0;
@@ -1300,8 +1472,8 @@ namespace MetriX.UI
                     }
 
                     // Activity indicator bar along bottom of row
-                    double connRatio = app.ActiveConnections / (double)totalConns;
-                    int barW = Math.Max(4, (int)((w - 4) * connRatio));
+                    double shareRatio = app.AttributionWeight / totalWeight;
+                    int barW = Math.Max(4, (int)((w - 4) * shareRatio));
                     g.FillRectangle(barBrush, 2, py + rowH - 2, barW, 2);
 
                     // Category Icon (X = 6)
@@ -1309,17 +1481,17 @@ namespace MetriX.UI
                     g.DrawString(icon, iconFont, nameBrush, 6, py + 2);
 
                     // Real-time Bandwidth Consumption (right-aligned)
-                    double appSpeed = totalBandwidth * connRatio;
                     string rateText;
                     Brush currentRateBrush;
-                    if (totalBandwidth > 1024)
+                    if (totalBandwidth > 512)
                     {
-                        rateText = string.Format("{0} ({1:F0}%)", FormatRate(appSpeed), connRatio * 100.0);
+                        double appSpeed = totalBandwidth * shareRatio;
+                        rateText = string.Format("{0} ({1:F0}%)", FormatRate(appSpeed), shareRatio * 100.0);
                         currentRateBrush = rateBrushActive;
                     }
                     else
                     {
-                        rateText = string.Format("{0:F0}% activity", connRatio * 100.0);
+                        rateText = string.Format("{0:F0}% activity", shareRatio * 100.0);
                         currentRateBrush = rateBrushIdle;
                     }
                     SizeF rateSz = g.MeasureString(rateText, rateFont);
@@ -1329,7 +1501,7 @@ namespace MetriX.UI
                     // App Name (between icon and consumption stats)
                     float nameX = 26;
                     int maxNameW = (int)(rx - 12 - nameX);
-                    string displayName = app.ProcessName;
+                    string displayName = app.ProcessCount > 1 ? string.Format("{0} ({1})", app.ProcessName, app.ProcessCount) : app.ProcessName;
                     SizeF nameSz = g.MeasureString(displayName, nameFont);
                     if (maxNameW > 20 && nameSz.Width > maxNameW)
                     {
@@ -1342,13 +1514,13 @@ namespace MetriX.UI
                     }
                     g.DrawString(displayName, nameFont, nameBrush, nameX, py + 2);
 
-                    // Subtle, clean socket count text (e.g. "(10)") right beside name without any clunky box
+                    // Subtle, clean socket count text e.g. "(17 conn)" right beside name
                     float connX = nameX + nameSz.Width + 4;
-                    if (connX + 28 < rx)
+                    if (connX + 44 < rx)
                     {
                         using (var mutedBrush = new SolidBrush(Color.FromArgb(135, 135, 142)))
                         {
-                            g.DrawString("(" + app.ActiveConnections + ")", badgeFont, mutedBrush, connX, py + 3);
+                            g.DrawString(string.Format("({0} conn)", app.ActiveConnections), badgeFont, mutedBrush, connX, py + 3);
                         }
                     }
                 }

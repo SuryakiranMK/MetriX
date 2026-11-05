@@ -84,6 +84,8 @@ namespace MetriX.Model
         public bool FloatingAlwaysOnTop { get; set; }
         public double FloatingScale { get; set; }
         public bool FloatingLocked { get; set; }
+        public int TopAppsLimit { get; set; }
+        public int SpeedTestDurationSeconds { get; set; }
 
         public AppConfig()
         {
@@ -133,6 +135,8 @@ namespace MetriX.Model
             FloatingAlwaysOnTop = true;
             FloatingScale = 1.0;
             FloatingLocked = false;
+            TopAppsLimit = 5;
+            SpeedTestDurationSeconds = 10;
         }
     }
 }

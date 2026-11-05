@@ -150,6 +150,30 @@ namespace MetriX.Services
                         case "EnableSilentAutoUpdate":
                             bool esu; if (bool.TryParse(val, out esu)) config.EnableSilentAutoUpdate = esu;
                             break;
+                        case "IsFloatingMode":
+                            bool ifm; if (bool.TryParse(val, out ifm)) config.IsFloatingMode = ifm;
+                            break;
+                        case "FloatingX":
+                            int fx; if (int.TryParse(val, out fx)) config.FloatingX = fx;
+                            break;
+                        case "FloatingY":
+                            int fy; if (int.TryParse(val, out fy)) config.FloatingY = fy;
+                            break;
+                        case "FloatingAlwaysOnTop":
+                            bool faot; if (bool.TryParse(val, out faot)) config.FloatingAlwaysOnTop = faot;
+                            break;
+                        case "FloatingScale":
+                            double fsc; if (double.TryParse(val, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out fsc)) config.FloatingScale = fsc;
+                            break;
+                        case "FloatingLocked":
+                            bool flk; if (bool.TryParse(val, out flk)) config.FloatingLocked = flk;
+                            break;
+                        case "TopAppsLimit":
+                            int tal; if (int.TryParse(val, out tal)) config.TopAppsLimit = tal;
+                            break;
+                        case "SpeedTestDurationSeconds":
+                            int std; if (int.TryParse(val, out std)) config.SpeedTestDurationSeconds = std;
+                            break;
                     }
                 }
             }
@@ -159,6 +183,11 @@ namespace MetriX.Services
             }
 
             return config;
+        }
+
+        public void Save()
+        {
+            Save(Config);
         }
 
         public void Save(AppConfig config)
@@ -201,7 +230,15 @@ namespace MetriX.Services
                     sw.WriteLine("  \"ShowOnAllMonitors\": " + config.ShowOnAllMonitors.ToString().ToLowerInvariant() + ",");
                     sw.WriteLine("  \"MonthlyDataQuotaGb\": " + config.MonthlyDataQuotaGb.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) + ",");
                     sw.WriteLine("  \"EnableAutoUpdateCheck\": " + config.EnableAutoUpdateCheck.ToString().ToLowerInvariant() + ",");
-                    sw.WriteLine("  \"EnableSilentAutoUpdate\": " + config.EnableSilentAutoUpdate.ToString().ToLowerInvariant());
+                    sw.WriteLine("  \"EnableSilentAutoUpdate\": " + config.EnableSilentAutoUpdate.ToString().ToLowerInvariant() + ",");
+                    sw.WriteLine("  \"IsFloatingMode\": " + config.IsFloatingMode.ToString().ToLowerInvariant() + ",");
+                    sw.WriteLine("  \"FloatingX\": " + config.FloatingX + ",");
+                    sw.WriteLine("  \"FloatingY\": " + config.FloatingY + ",");
+                    sw.WriteLine("  \"FloatingAlwaysOnTop\": " + config.FloatingAlwaysOnTop.ToString().ToLowerInvariant() + ",");
+                    sw.WriteLine("  \"FloatingScale\": " + config.FloatingScale.ToString("F2", System.Globalization.CultureInfo.InvariantCulture) + ",");
+                    sw.WriteLine("  \"FloatingLocked\": " + config.FloatingLocked.ToString().ToLowerInvariant() + ",");
+                    sw.WriteLine("  \"TopAppsLimit\": " + config.TopAppsLimit + ",");
+                    sw.WriteLine("  \"SpeedTestDurationSeconds\": " + config.SpeedTestDurationSeconds);
                     sw.WriteLine("}");
                 }
 

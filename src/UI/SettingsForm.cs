@@ -66,6 +66,8 @@ namespace MetriX.UI
         private FluentDropdown _cbAdapter;
         private FluentDropdown _cbRefreshInterval;
         private FluentDropdown _cbLeftClickAction;
+        private FluentDropdown _cbTopAppsLimit;
+        private FluentDropdown _cbSpeedTestDuration;
         private FluentNumericStepper _stepperDataQuota;
         private FluentToggleSwitch _toggleStartWithWindows;
         private FluentToggleSwitch _toggleSilentUpdate;
@@ -153,7 +155,9 @@ namespace MetriX.UI
                 FloatingY = src.FloatingY,
                 FloatingAlwaysOnTop = src.FloatingAlwaysOnTop,
                 FloatingScale = src.FloatingScale,
-                FloatingLocked = src.FloatingLocked
+                FloatingLocked = src.FloatingLocked,
+                TopAppsLimit = src.TopAppsLimit,
+                SpeedTestDurationSeconds = src.SpeedTestDurationSeconds
             };
         }
 
@@ -794,7 +798,36 @@ namespace MetriX.UI
             };
             y = AddSettingCard(page, new FluentSettingCard("Taskbar Left-Click Action", "Action triggered when clicking the meter on your taskbar", _cbLeftClickAction), y);
 
-            // Card 4: Monthly Data Quota
+            // Card 4: Top Network Apps Limit
+            _cbTopAppsLimit = new FluentDropdown { Width = 280 };
+            _cbTopAppsLimit.Items.Add("3 Apps");
+            _cbTopAppsLimit.Items.Add("5 Apps (Recommended)");
+            _cbTopAppsLimit.Items.Add("8 Apps");
+            _cbTopAppsLimit.Items.Add("10 Apps");
+            _cbTopAppsLimit.Items.Add("Auto (All Active Consumers)");
+            _cbTopAppsLimit.SelectedIndexChanged += (s, e) =>
+            {
+                int[] limits = new int[] { 3, 5, 8, 10, 0 };
+                int idx = _cbTopAppsLimit.SelectedIndex;
+                if (idx >= 0 && idx < limits.Length) _workingConfig.TopAppsLimit = limits[idx];
+            };
+            y = AddSettingCard(page, new FluentSettingCard("Top Network Apps Limit", "Number of active process rows displayed in flyout telemetry", _cbTopAppsLimit), y);
+
+            // Card 5: Speed Test Assessment Duration
+            _cbSpeedTestDuration = new FluentDropdown { Width = 280 };
+            _cbSpeedTestDuration.Items.Add("5 seconds");
+            _cbSpeedTestDuration.Items.Add("10 seconds (Recommended)");
+            _cbSpeedTestDuration.Items.Add("15 seconds");
+            _cbSpeedTestDuration.Items.Add("30 seconds");
+            _cbSpeedTestDuration.SelectedIndexChanged += (s, e) =>
+            {
+                int[] durations = new int[] { 5, 10, 15, 30 };
+                int idx = _cbSpeedTestDuration.SelectedIndex;
+                if (idx >= 0 && idx < durations.Length) _workingConfig.SpeedTestDurationSeconds = durations[idx];
+            };
+            y = AddSettingCard(page, new FluentSettingCard("Speed Test Assessment Duration", "Duration in seconds to assess download and upload throughput", _cbSpeedTestDuration), y);
+
+            // Card 6: Monthly Data Quota
             _stepperDataQuota = new FluentNumericStepper { Minimum = 0, Maximum = 5000, Increment = 10, Suffix = " GB", Size = new Size(120, 28) };
             _stepperDataQuota.ValueChanged += (s, e) =>
             {
@@ -1114,6 +1147,23 @@ namespace MetriX.UI
             if (_workingConfig.LeftClickAction == LeftClickAction.Flyout) _cbLeftClickAction.SelectedIndex = 0;
             else if (_workingConfig.LeftClickAction == LeftClickAction.TaskManager) _cbLeftClickAction.SelectedIndex = 1;
             else _cbLeftClickAction.SelectedIndex = 2;
+
+            if (_cbTopAppsLimit != null)
+            {
+                if (_workingConfig.TopAppsLimit == 3) _cbTopAppsLimit.SelectedIndex = 0;
+                else if (_workingConfig.TopAppsLimit == 5) _cbTopAppsLimit.SelectedIndex = 1;
+                else if (_workingConfig.TopAppsLimit == 8) _cbTopAppsLimit.SelectedIndex = 2;
+                else if (_workingConfig.TopAppsLimit == 10) _cbTopAppsLimit.SelectedIndex = 3;
+                else _cbTopAppsLimit.SelectedIndex = 4; // 0 = Auto
+            }
+
+            if (_cbSpeedTestDuration != null)
+            {
+                if (_workingConfig.SpeedTestDurationSeconds <= 5) _cbSpeedTestDuration.SelectedIndex = 0;
+                else if (_workingConfig.SpeedTestDurationSeconds <= 10) _cbSpeedTestDuration.SelectedIndex = 1;
+                else if (_workingConfig.SpeedTestDurationSeconds <= 15) _cbSpeedTestDuration.SelectedIndex = 2;
+                else _cbSpeedTestDuration.SelectedIndex = 3;
+            }
 
             _stepperDataQuota.Value = (decimal)_workingConfig.MonthlyDataQuotaGb;
             _toggleStartWithWindows.Checked = _workingConfig.StartWithWindows;
