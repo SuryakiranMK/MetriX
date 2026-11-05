@@ -91,14 +91,28 @@ namespace MetriX.UI
             try
             {
                 if (!IsHandleCreated) return;
-                // Keep OverlayWindow an independent HWND_TOPMOST window (GWLP_HWNDPARENT = 0).
-                // Setting GWLP_HWNDPARENT to Shell_TrayWnd subordinates the window z-order,
-                // which allows Windows 11 to hide the meter whenever taskbar thumbnail previews appear
-                // or during Show Desktop (Win+D).
-                IntPtr currentOwner = NativeMethods.GetWindowLongPtr(Handle, NativeMethods.GWLP_HWNDPARENT);
-                if (currentOwner != IntPtr.Zero)
+                var cfg = _configService.Config;
+                if (cfg.IsFloatingMode)
                 {
-                    NativeMethods.SetWindowLongPtr(Handle, NativeMethods.GWLP_HWNDPARENT, IntPtr.Zero);
+                    IntPtr currentOwner = NativeMethods.GetWindowLongPtr(Handle, NativeMethods.GWLP_HWNDPARENT);
+                    if (currentOwner != IntPtr.Zero)
+                    {
+                        NativeMethods.SetWindowLongPtr(Handle, NativeMethods.GWLP_HWNDPARENT, IntPtr.Zero);
+                    }
+                    return;
+                }
+
+                IntPtr hTaskbar = _secondaryTaskbarHandle != IntPtr.Zero
+                    ? _secondaryTaskbarHandle
+                    : (_taskbarTracker != null ? _taskbarTracker.TaskbarHandle : IntPtr.Zero);
+
+                if (hTaskbar != IntPtr.Zero)
+                {
+                    IntPtr currentOwner = NativeMethods.GetWindowLongPtr(Handle, NativeMethods.GWLP_HWNDPARENT);
+                    if (currentOwner != hTaskbar)
+                    {
+                        NativeMethods.SetWindowLongPtr(Handle, NativeMethods.GWLP_HWNDPARENT, hTaskbar);
+                    }
                 }
             }
             catch { }
@@ -647,13 +661,10 @@ namespace MetriX.UI
                     ref blend,
                     NativeMethods.ULW_ALPHA);
 
-                // Only reposition window if bounds changed to eliminate DWM recomposition flicker
-                if (bounds != _lastRenderedBounds || !Visible)
-                {
-                    NativeMethods.SetWindowPos(Handle, NativeMethods.HWND_TOPMOST, bounds.X, bounds.Y, width, height,
-                        NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_SHOWWINDOW);
-                    _lastRenderedBounds = bounds;
-                }
+                // Ensure it stays at topmost layer on taskbar without stealing focus
+                NativeMethods.SetWindowPos(Handle, NativeMethods.HWND_TOPMOST, bounds.X, bounds.Y, width, height,
+                    NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_SHOWWINDOW);
+                _lastRenderedBounds = bounds;
             }
             finally
             {
@@ -962,11 +973,18 @@ namespace MetriX.UI
                             wp.flags &= ~NativeMethods.SWP_HIDEWINDOW;
                             wp.flags |= NativeMethods.SWP_SHOWWINDOW;
                         }
-                    }
 
-                    if ((wp.flags & NativeMethods.SWP_NOZORDER) == 0 && wp.hwndInsertAfter != NativeMethods.HWND_TOPMOST)
-                    {
+                        // Always force HWND_TOPMOST and clear SWP_NOZORDER so Windows Shell
+                        // cannot demote the docked indicator below the taskbar or tab previews.
+                        wp.flags &= ~NativeMethods.SWP_NOZORDER;
                         wp.hwndInsertAfter = NativeMethods.HWND_TOPMOST;
+                    }
+                    else
+                    {
+                        if ((wp.flags & NativeMethods.SWP_NOZORDER) == 0 && wp.hwndInsertAfter != NativeMethods.HWND_TOPMOST)
+                        {
+                            wp.hwndInsertAfter = NativeMethods.HWND_TOPMOST;
+                        }
                     }
                     Marshal.StructureToPtr(wp, m.LParam, false);
                 }
