@@ -64,11 +64,20 @@ namespace MetriX.UI
 
             var itemCheckUpdate = new ToolStripMenuItem("🔄  Check for Updates...", null, (s, e) => TriggerManualUpdateCheck());
 
+            var itemDisplayOnly = new ToolStripMenuItem("👁️  Display Only Mode", null, (s, e) =>
+            {
+                if (_overlayWindow != null && !_overlayWindow.IsDisposed)
+                {
+                    _overlayWindow.ToggleDisplayOnlyMode();
+                }
+            });
+
             var itemExit = new ToolStripMenuItem("❌  Exit metriX", null, (s, e) => ExitThread());
 
             menu.Items.Add(itemFlyout);
             menu.Items.Add(itemSettings);
             menu.Items.Add(itemCheckUpdate);
+            menu.Items.Add(itemDisplayOnly);
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(itemExit);
 
@@ -229,6 +238,29 @@ namespace MetriX.UI
             };
             _overlayWindow.RequestCheckUpdates += TriggerManualUpdateCheck;
             _overlayWindow.RequestExit += ExitThread;
+            _overlayWindow.DisplayOnlyModeToggled += (isDisplayOnly) =>
+            {
+                foreach (var sec in _secondaryOverlays)
+                {
+                    if (sec != null && !sec.IsDisposed)
+                    {
+                        sec.ApplyDisplayOnlyMode();
+                    }
+                }
+
+                if (_notifyIcon != null)
+                {
+                    string hk = _configService.Config.DisplayOnlyHotkey ?? "Ctrl + `";
+                    if (isDisplayOnly)
+                    {
+                        _notifyIcon.ShowBalloonTip(3500, "metriX Display-Only Mode", "metriX is now in click-through Display-Only Mode.\nPress " + hk + " to unlock interactivity.", ToolTipIcon.Info);
+                    }
+                    else
+                    {
+                        _notifyIcon.ShowBalloonTip(2500, "metriX Interactive Mode", "metriX is now interactive and clickable.", ToolTipIcon.Info);
+                    }
+                }
+            };
             _overlayWindow.Show();
 
             SynchronizeSecondaryOverlays();
@@ -318,6 +350,8 @@ namespace MetriX.UI
                 {
                     _sampleTimer.Interval = _configService.Config.UpdateIntervalMs;
                     _networkMonitor.ResetBaseline();
+                    _overlayWindow.RegisterDisplayOnlyHotkey();
+                    _overlayWindow.ApplyDisplayOnlyMode();
                     _overlayWindow.InvalidateDimensions();
                     SynchronizeSecondaryOverlays();
                     _overlayWindow.RenderFrame();
@@ -326,6 +360,7 @@ namespace MetriX.UI
                     {
                         if (sec != null && !sec.IsDisposed && sec.Visible)
                         {
+                            sec.ApplyDisplayOnlyMode();
                             sec.InvalidateDimensions();
                             sec.RenderFrame();
                         }

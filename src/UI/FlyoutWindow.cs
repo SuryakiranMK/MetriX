@@ -42,6 +42,19 @@ namespace MetriX.UI
 
         // Live Monitor Controls
         private DoubleBufferedPanel _graphPanel;
+        private Panel _headerPanel;
+        private Panel _footerPanel;
+        private Label _lblTitle;
+        private Panel _pnlSegment;
+        private Button _btnClose;
+        private Button _btnFooterSettings;
+        private Button _btnFooterTaskMgr;
+        private Button _btnFooterReset;
+        private Panel _cardUsage;
+        private Panel _cardMetrics;
+        private Panel _pnlDuration;
+        private Panel _cardHistory;
+
         private Label _lblDownloadStats;
         private Label _lblUploadStats;
         private Label _lblAdapterInfo;
@@ -156,21 +169,21 @@ namespace MetriX.UI
             Height = 565;
 
             // Header bar
-            var headerPanel = new Panel
+            _headerPanel = new Panel
             {
                 Dock = DockStyle.Top,
                 Height = 46,
                 BackColor = Color.FromArgb(32, 32, 36)
             };
-            headerPanel.Paint += (s, e) =>
+            _headerPanel.Paint += (s, e) =>
             {
                 using (var pen = new Pen(Color.FromArgb(44, 44, 48), 1))
                 {
-                    e.Graphics.DrawLine(pen, 0, headerPanel.Height - 1, headerPanel.Width, headerPanel.Height - 1);
+                    e.Graphics.DrawLine(pen, 0, _headerPanel.Height - 1, _headerPanel.Width, _headerPanel.Height - 1);
                 }
             };
 
-            var lblTitle = new Label
+            _lblTitle = new Label
             {
                 Text = "metriX",
                 Font = new Font("Segoe UI", 11.0f, FontStyle.Bold),
@@ -181,17 +194,17 @@ namespace MetriX.UI
             };
 
             // Segmented View Switcher Pill
-            var pnlSegment = new Panel
+            _pnlSegment = new Panel
             {
                 Size = new Size(184, 32),
                 Location = new Point(106, 7),
                 BackColor = Color.FromArgb(22, 22, 26)
             };
-            pnlSegment.Paint += (s, e) =>
+            _pnlSegment.Paint += (s, e) =>
             {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
                 using (var pen = new Pen(Color.FromArgb(48, 48, 54), 1))
-                using (var path = GetRoundedRect(0, 0, pnlSegment.Width - 1, pnlSegment.Height - 1, 4))
+                using (var path = GetRoundedRect(0, 0, _pnlSegment.Width - 1, _pnlSegment.Height - 1, 4))
                 {
                     e.Graphics.DrawPath(pen, path);
                 }
@@ -237,10 +250,10 @@ namespace MetriX.UI
             };
             _tabBtnSpeedTest.Click += (s, e) => SwitchView(true);
 
-            pnlSegment.Controls.Add(_tabBtnMonitor);
-            pnlSegment.Controls.Add(_tabBtnSpeedTest);
+            _pnlSegment.Controls.Add(_tabBtnMonitor);
+            _pnlSegment.Controls.Add(_tabBtnSpeedTest);
 
-            var btnClose = new Button
+            _btnClose = new Button
             {
                 Text = "✕",
                 Font = new Font("Segoe UI", 10.0f, FontStyle.Regular),
@@ -248,28 +261,29 @@ namespace MetriX.UI
                 BackColor = Color.Transparent,
                 FlatStyle = FlatStyle.Flat,
                 Size = new Size(46, 46),
-                Location = new Point(Width - 46, 0),
+                Dock = DockStyle.Right,
                 Cursor = Cursors.Hand,
                 UseMnemonic = false,
                 TextAlign = ContentAlignment.MiddleCenter
             };
-            btnClose.FlatAppearance.BorderSize = 0;
-            btnClose.FlatAppearance.MouseOverBackColor = Color.FromArgb(196, 43, 28);
-            btnClose.FlatAppearance.MouseDownBackColor = Color.FromArgb(180, 35, 20);
-            btnClose.MouseEnter += (s, e) => { btnClose.ForeColor = Color.White; };
-            btnClose.MouseLeave += (s, e) => { btnClose.ForeColor = Color.FromArgb(180, 180, 185); };
-            btnClose.Click += (s, e) => Hide();
+            _btnClose.FlatAppearance.BorderSize = 0;
+            _btnClose.FlatAppearance.MouseOverBackColor = Color.FromArgb(196, 43, 28);
+            _btnClose.FlatAppearance.MouseDownBackColor = Color.FromArgb(180, 35, 20);
+            _btnClose.MouseEnter += (s, e) => { _btnClose.ForeColor = Color.White; };
+            _btnClose.MouseLeave += (s, e) => { _btnClose.ForeColor = Color.FromArgb(180, 180, 185); };
+            _btnClose.Click += (s, e) => Hide();
 
-            headerPanel.Controls.Add(lblTitle);
-            headerPanel.Controls.Add(pnlSegment);
-            headerPanel.Controls.Add(btnClose);
-            Controls.Add(headerPanel);
+            _headerPanel.Controls.Add(_lblTitle);
+            _headerPanel.Controls.Add(_pnlSegment);
+            _headerPanel.Controls.Add(_btnClose);
+            Controls.Add(_headerPanel);
 
             // Container 1: Live Monitor View
             _panelMonitor = new Panel
             {
                 Location = new Point(0, 46),
                 Size = new Size(Width, 469),
+                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
                 BackColor = Color.FromArgb(28, 28, 30)
             };
             BuildMonitorView(_panelMonitor);
@@ -280,6 +294,7 @@ namespace MetriX.UI
             {
                 Location = new Point(0, 46),
                 Size = new Size(Width, 469),
+                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
                 BackColor = Color.FromArgb(28, 28, 30),
                 Visible = false
             };
@@ -289,21 +304,21 @@ namespace MetriX.UI
             UpdateViewTabs();
 
             // Footer action bar (docked to bottom, height 50)
-            var footerPanel = new Panel
+            _footerPanel = new Panel
             {
                 Dock = DockStyle.Bottom,
                 Height = 50,
                 BackColor = Color.FromArgb(24, 24, 28)
             };
-            footerPanel.Paint += (s, e) =>
+            _footerPanel.Paint += (s, e) =>
             {
                 using (var pen = new Pen(Color.FromArgb(45, 45, 50), 1))
                 {
-                    e.Graphics.DrawLine(pen, 0, 0, footerPanel.Width, 0);
+                    e.Graphics.DrawLine(pen, 0, 0, _footerPanel.Width, 0);
                 }
             };
 
-            var btnSettings = new Button
+            _btnFooterSettings = new Button
             {
                 Text = "⚙ Settings",
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
@@ -315,14 +330,34 @@ namespace MetriX.UI
                 Cursor = Cursors.Hand,
                 UseMnemonic = false
             };
-            btnSettings.FlatAppearance.BorderColor = Color.FromArgb(55, 55, 60);
-            btnSettings.Click += (s, e) =>
+            _btnFooterSettings.FlatAppearance.BorderColor = Color.FromArgb(55, 55, 60);
+            _btnFooterSettings.Click += (s, e) =>
             {
                 Hide();
                 if (RequestOpenSettings != null) RequestOpenSettings();
             };
 
-            var btnTaskMgr = new Button
+            _btnFooterReset = new Button
+            {
+                Text = "🔄 Reset",
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
+                ForeColor = Color.FromArgb(200, 200, 200),
+                BackColor = Color.FromArgb(38, 38, 42),
+                FlatStyle = FlatStyle.Flat,
+                Size = new Size(98, 32),
+                Location = new Point(280, 9),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Cursor = Cursors.Hand,
+                UseMnemonic = false
+            };
+            _btnFooterReset.FlatAppearance.BorderColor = Color.FromArgb(55, 55, 60);
+            _btnFooterReset.Click += (s, e) =>
+            {
+                _networkMonitor.ResetSessionStats();
+                UpdateData();
+            };
+
+            _btnFooterTaskMgr = new Button
             {
                 Text = "📊 Task Manager",
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
@@ -334,8 +369,8 @@ namespace MetriX.UI
                 Cursor = Cursors.Hand,
                 UseMnemonic = false
             };
-            btnTaskMgr.FlatAppearance.BorderColor = Color.FromArgb(55, 55, 60);
-            btnTaskMgr.Click += (s, e) =>
+            _btnFooterTaskMgr.FlatAppearance.BorderColor = Color.FromArgb(55, 55, 60);
+            _btnFooterTaskMgr.Click += (s, e) =>
             {
                 try
                 {
@@ -344,29 +379,12 @@ namespace MetriX.UI
                 catch { }
             };
 
-            var btnReset = new Button
-            {
-                Text = "🔄 Reset",
-                Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
-                ForeColor = Color.FromArgb(200, 200, 200),
-                BackColor = Color.FromArgb(38, 38, 42),
-                FlatStyle = FlatStyle.Flat,
-                Size = new Size(98, 32),
-                Location = new Point(264, 9),
-                Cursor = Cursors.Hand,
-                UseMnemonic = false
-            };
-            btnReset.FlatAppearance.BorderColor = Color.FromArgb(55, 55, 60);
-            btnReset.Click += (s, e) =>
-            {
-                _networkMonitor.ResetSessionStats();
-                UpdateData();
-            };
+            _footerPanel.Controls.Add(_btnFooterSettings);
+            _footerPanel.Controls.Add(_btnFooterTaskMgr);
+            _footerPanel.Controls.Add(_btnFooterReset);
+            Controls.Add(_footerPanel);
 
-            footerPanel.Controls.Add(btnSettings);
-            footerPanel.Controls.Add(btnTaskMgr);
-            footerPanel.Controls.Add(btnReset);
-            Controls.Add(footerPanel);
+            RelayoutFlyout();
         }
 
         private void SwitchView(bool speedTest)
@@ -464,7 +482,7 @@ namespace MetriX.UI
             _graphPanel = new DoubleBufferedPanel
             {
                 Location = new Point(14, 34),
-                Size = new Size(w, 150),
+                Size = new Size(w, 165),
                 BackColor = Color.FromArgb(20, 20, 22),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
@@ -489,25 +507,25 @@ namespace MetriX.UI
             _monitorContentPanel.Controls.Add(_graphPanel);
 
             // Card 1: Data Used Till Now (Today / This Week / This Month)
-            int usageY = 192;
-            var cardUsage = new Panel
+            int usageY = 206;
+            _cardUsage = new Panel
             {
                 Location = new Point(14, usageY),
-                Size = new Size(w, 84),
+                Size = new Size(w, 88),
                 BackColor = Color.FromArgb(34, 34, 38),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
-            cardUsage.Paint += (s, e) =>
+            _cardUsage.Paint += (s, e) =>
             {
                 using (var pen = new Pen(Color.FromArgb(48, 48, 54), 1))
                 {
-                    e.Graphics.DrawRectangle(pen, 0, 0, cardUsage.Width - 1, cardUsage.Height - 1);
+                    e.Graphics.DrawRectangle(pen, 0, 0, _cardUsage.Width - 1, _cardUsage.Height - 1);
                 }
                 using (var divPen = new Pen(Color.FromArgb(44, 44, 48), 1))
                 {
-                    int colW = cardUsage.Width / 3;
-                    e.Graphics.DrawLine(divPen, colW, 20, colW, cardUsage.Height - 10);
-                    e.Graphics.DrawLine(divPen, colW * 2, 20, colW * 2, cardUsage.Height - 10);
+                    int colW = _cardUsage.Width / 3;
+                    e.Graphics.DrawLine(divPen, colW, 20, colW, _cardUsage.Height - 10);
+                    e.Graphics.DrawLine(divPen, colW * 2, 20, colW * 2, _cardUsage.Height - 10);
                 }
             };
 
@@ -589,17 +607,17 @@ namespace MetriX.UI
                 UseMnemonic = false
             };
 
-            cardUsage.Controls.Add(lblUsageTitle);
-            cardUsage.Controls.Add(_lblUsageTodayVal);
-            cardUsage.Controls.Add(_lblUsageTodaySub);
-            cardUsage.Controls.Add(_lblUsageWeekVal);
-            cardUsage.Controls.Add(_lblUsageWeekSub);
-            cardUsage.Controls.Add(_lblUsageMonthVal);
-            cardUsage.Controls.Add(_lblUsageMonthSub);
-            _monitorContentPanel.Controls.Add(cardUsage);
+            _cardUsage.Controls.Add(lblUsageTitle);
+            _cardUsage.Controls.Add(_lblUsageTodayVal);
+            _cardUsage.Controls.Add(_lblUsageTodaySub);
+            _cardUsage.Controls.Add(_lblUsageWeekVal);
+            _cardUsage.Controls.Add(_lblUsageWeekSub);
+            _cardUsage.Controls.Add(_lblUsageMonthVal);
+            _cardUsage.Controls.Add(_lblUsageMonthSub);
+            _monitorContentPanel.Controls.Add(_cardUsage);
 
             // Card 2: Active Connection & Session Telemetry
-            int cardY = 284;
+            int cardY = 302;
             _cardSession = new Panel
             {
                 Location = new Point(14, cardY),
@@ -811,18 +829,18 @@ namespace MetriX.UI
             container.Controls.Add(_lblSpeedTestStatus);
 
             // 3 Metrics Badges Card
-            var cardMetrics = new Panel
+            _cardMetrics = new Panel
             {
                 Location = new Point(14, 170),
                 Size = new Size(w, 48),
                 BackColor = Color.FromArgb(34, 34, 38),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
-            cardMetrics.Paint += (s, e) =>
+            _cardMetrics.Paint += (s, e) =>
             {
                 using (var pen = new Pen(Color.FromArgb(48, 48, 54), 1))
                 {
-                    e.Graphics.DrawRectangle(pen, 0, 0, cardMetrics.Width - 1, cardMetrics.Height - 1);
+                    e.Graphics.DrawRectangle(pen, 0, 0, _cardMetrics.Width - 1, _cardMetrics.Height - 1);
                 }
             };
 
@@ -861,13 +879,13 @@ namespace MetriX.UI
                 UseMnemonic = false
             };
 
-            cardMetrics.Controls.Add(_lblTestPing);
-            cardMetrics.Controls.Add(_lblTestDownload);
-            cardMetrics.Controls.Add(_lblTestUpload);
-            container.Controls.Add(cardMetrics);
+            _cardMetrics.Controls.Add(_lblTestPing);
+            _cardMetrics.Controls.Add(_lblTestDownload);
+            _cardMetrics.Controls.Add(_lblTestUpload);
+            container.Controls.Add(_cardMetrics);
 
             // Duration Selector Capsule Pills
-            var pnlDuration = new Panel
+            _pnlDuration = new Panel
             {
                 Location = new Point(14, 222),
                 Size = new Size(w, 28),
@@ -884,7 +902,7 @@ namespace MetriX.UI
                 AutoSize = true,
                 UseMnemonic = false
             };
-            pnlDuration.Controls.Add(lblDurTitle);
+            _pnlDuration.Controls.Add(lblDurTitle);
 
             int pillW = 54;
             int pillGap = 6;
@@ -897,11 +915,11 @@ namespace MetriX.UI
 
             UpdateDurationButtons();
 
-            pnlDuration.Controls.Add(_btnDur5s);
-            pnlDuration.Controls.Add(_btnDur10s);
-            pnlDuration.Controls.Add(_btnDur15s);
-            pnlDuration.Controls.Add(_btnDur30s);
-            container.Controls.Add(pnlDuration);
+            _pnlDuration.Controls.Add(_btnDur5s);
+            _pnlDuration.Controls.Add(_btnDur10s);
+            _pnlDuration.Controls.Add(_btnDur15s);
+            _pnlDuration.Controls.Add(_btnDur30s);
+            container.Controls.Add(_pnlDuration);
 
             // Start / Cancel Test Button
             _btnStartSpeedTest = new Button
@@ -922,18 +940,18 @@ namespace MetriX.UI
             container.Controls.Add(_btnStartSpeedTest);
 
             // Recent Benchmark History Card - EXPANDED TO FILL VIEWPORT
-            var cardHistory = new Panel
+            _cardHistory = new Panel
             {
                 Location = new Point(14, 296),
                 Size = new Size(w, container.Height - 296 - 10),
                 BackColor = Color.FromArgb(34, 34, 38),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom
             };
-            cardHistory.Paint += (s, e) =>
+            _cardHistory.Paint += (s, e) =>
             {
                 using (var pen = new Pen(Color.FromArgb(48, 48, 54), 1))
                 {
-                    e.Graphics.DrawRectangle(pen, 0, 0, cardHistory.Width - 1, cardHistory.Height - 1);
+                    e.Graphics.DrawRectangle(pen, 0, 0, _cardHistory.Width - 1, _cardHistory.Height - 1);
                 }
             };
 
@@ -954,14 +972,14 @@ namespace MetriX.UI
                 ForeColor = Color.FromArgb(160, 160, 165),
                 TextAlign = ContentAlignment.TopLeft,
                 Location = new Point(10, 26),
-                Size = new Size(w - 20, Math.Max(50, cardHistory.Height - 34)),
+                Size = new Size(w - 20, Math.Max(50, _cardHistory.Height - 34)),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
                 UseMnemonic = false
             };
 
-            cardHistory.Controls.Add(lblHistTitle);
-            cardHistory.Controls.Add(_lblTestHistory);
-            container.Controls.Add(cardHistory);
+            _cardHistory.Controls.Add(lblHistTitle);
+            _cardHistory.Controls.Add(_lblTestHistory);
+            container.Controls.Add(_cardHistory);
         }
 
         private Button CreateDurationButton(string text, int durationSec, int x, int y, int width)
@@ -1295,6 +1313,177 @@ namespace MetriX.UI
             }
         }
 
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            RelayoutFlyout();
+        }
+
+        private void RelayoutFlyout()
+        {
+            if (_headerPanel == null || _panelMonitor == null) return;
+
+            int clientW = ClientSize.Width;
+            int clientH = ClientSize.Height;
+            int contentH = Math.Max(200, clientH - 46 - 50);
+
+            _headerPanel.Width = clientW;
+            if (_btnClose != null)
+            {
+                _btnClose.Left = clientW - _btnClose.Width;
+                _btnClose.Top = 0;
+            }
+            if (_pnlSegment != null && _lblTitle != null && _btnClose != null)
+            {
+                int remainingW = _btnClose.Left - _lblTitle.Right;
+                _pnlSegment.Left = _lblTitle.Right + (remainingW - _pnlSegment.Width) / 2;
+            }
+
+            _panelMonitor.Size = new Size(clientW, contentH);
+            _panelSpeedTest.Size = new Size(clientW, contentH);
+
+            int w = clientW - 28;
+
+            // Monitor view layout
+            if (_monitorContentPanel != null)
+            {
+                _monitorContentPanel.Width = clientW;
+
+                if (_graphPanel != null)
+                {
+                    _graphPanel.Location = new Point(14, 34);
+                    _graphPanel.Size = new Size(w, 165);
+                }
+
+                if (_lblUploadStats != null && _lblDownloadStats != null)
+                {
+                    _lblUploadStats.Location = new Point(14 + w - _lblUploadStats.PreferredWidth - 2, 9);
+                    _lblDownloadStats.Location = new Point(_lblUploadStats.Left - _lblDownloadStats.PreferredWidth - 12, 9);
+                }
+
+                if (_cardUsage != null)
+                {
+                    _cardUsage.Location = new Point(14, 206);
+                    _cardUsage.Size = new Size(w, 88);
+                    int colWidth = w / 3;
+
+                    if (_lblUsageTodayVal != null) _lblUsageTodayVal.Size = new Size(colWidth - 16, 26);
+                    if (_lblUsageTodaySub != null) _lblUsageTodaySub.Size = new Size(colWidth - 16, 18);
+
+                    if (_lblUsageWeekVal != null)
+                    {
+                        _lblUsageWeekVal.Location = new Point(colWidth + 8, 22);
+                        _lblUsageWeekVal.Size = new Size(colWidth - 16, 26);
+                    }
+                    if (_lblUsageWeekSub != null)
+                    {
+                        _lblUsageWeekSub.Location = new Point(colWidth + 8, 50);
+                        _lblUsageWeekSub.Size = new Size(colWidth - 16, 18);
+                    }
+
+                    if (_lblUsageMonthVal != null)
+                    {
+                        _lblUsageMonthVal.Location = new Point((colWidth * 2) + 8, 22);
+                        _lblUsageMonthVal.Size = new Size(colWidth - 16, 26);
+                    }
+                    if (_lblUsageMonthSub != null)
+                    {
+                        _lblUsageMonthSub.Location = new Point((colWidth * 2) + 8, 50);
+                        _lblUsageMonthSub.Size = new Size(colWidth - 16, 18);
+                    }
+                }
+
+                if (_cardSession != null)
+                {
+                    _cardSession.Location = new Point(14, 302);
+                    _cardSession.Width = w;
+                    if (_lblAdapterInfo != null) _lblAdapterInfo.Width = w - 20;
+                    if (_lblSessionTotals != null) _lblSessionTotals.Width = w - 20;
+                    if (_lblQuotaStats != null) _lblQuotaStats.Width = w - 20;
+                    if (_quotaProgressBar != null) _quotaProgressBar.Width = w - 20;
+                    if (_pnlTopApps != null) _pnlTopApps.Width = w - 20;
+                }
+
+                if (_monitorScrollBar != null)
+                {
+                    _monitorScrollBar.Left = clientW - 10;
+                    _monitorScrollBar.Height = contentH - 8;
+                }
+
+                UpdateMonitorLayout();
+            }
+
+            // Speed test view layout
+            if (_panelSpeedTest != null)
+            {
+                if (_gaugePanel != null)
+                {
+                    _gaugePanel.Location = new Point(14, 6);
+                    _gaugePanel.Size = new Size(w, 142);
+                }
+
+                if (_lblSpeedTestStatus != null)
+                {
+                    _lblSpeedTestStatus.Location = new Point(14, 150);
+                    _lblSpeedTestStatus.Width = w;
+                }
+
+                if (_cardMetrics != null)
+                {
+                    _cardMetrics.Location = new Point(14, 170);
+                    _cardMetrics.Size = new Size(w, 48);
+                    int badgeW = w / 3;
+                    if (_lblTestPing != null) _lblTestPing.Size = new Size(badgeW - 12, 38);
+                    if (_lblTestDownload != null)
+                    {
+                        _lblTestDownload.Location = new Point(badgeW + 6, 4);
+                        _lblTestDownload.Size = new Size(badgeW - 12, 38);
+                    }
+                    if (_lblTestUpload != null)
+                    {
+                        _lblTestUpload.Location = new Point((badgeW * 2) + 6, 4);
+                        _lblTestUpload.Size = new Size(badgeW - 12, 38);
+                    }
+                }
+
+                if (_pnlDuration != null)
+                {
+                    _pnlDuration.Location = new Point(14, 222);
+                    _pnlDuration.Width = w;
+                }
+
+                if (_btnStartSpeedTest != null)
+                {
+                    _btnStartSpeedTest.Location = new Point(14, 254);
+                    _btnStartSpeedTest.Width = w;
+                }
+
+                if (_cardHistory != null)
+                {
+                    _cardHistory.Location = new Point(14, 296);
+                    _cardHistory.Size = new Size(w, Math.Max(50, contentH - 296 - 10));
+                    if (_lblTestHistory != null)
+                    {
+                        _lblTestHistory.Width = _cardHistory.Width - 20;
+                    }
+                }
+            }
+
+            if (_footerPanel != null)
+            {
+                _footerPanel.Width = clientW;
+                if (_btnFooterReset != null)
+                {
+                    _btnFooterReset.Left = clientW - 12 - _btnFooterReset.Width;
+                }
+                if (_btnFooterSettings != null && _btnFooterTaskMgr != null && _btnFooterReset != null)
+                {
+                    _btnFooterTaskMgr.Left = _btnFooterSettings.Right + 8;
+                    _btnFooterTaskMgr.Width = Math.Max(100, _btnFooterReset.Left - _btnFooterTaskMgr.Left - 8);
+                }
+            }
+        }
+
         public void Toggle(Rectangle meterBounds)
         {
             if (Visible)
@@ -1307,11 +1496,7 @@ namespace MetriX.UI
             int w = DpiHelper.Scale(390, dpi);
             int h = DpiHelper.Scale(565, dpi);
             Size = new Size(w, h);
-
-            int contentW = ClientSize.Width;
-            int contentH = ClientSize.Height - 46 - 50;
-            if (_panelMonitor != null) _panelMonitor.Size = new Size(contentW, contentH);
-            if (_panelSpeedTest != null) _panelSpeedTest.Size = new Size(contentW, contentH);
+            RelayoutFlyout();
 
             Screen scr = Screen.FromRectangle(meterBounds);
             Rectangle workArea = scr.WorkingArea;

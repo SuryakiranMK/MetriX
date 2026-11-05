@@ -70,6 +70,8 @@ namespace MetriX.UI
         private FluentDropdown _cbSpeedTestDuration;
         private FluentNumericStepper _stepperDataQuota;
         private FluentToggleSwitch _toggleStartWithWindows;
+        private FluentToggleSwitch _toggleDisplayOnlyMode;
+        private FluentDropdown _cbDisplayOnlyHotkey;
         private FluentToggleSwitch _toggleSilentUpdate;
 
         public SettingsForm(ConfigService configService, NetworkMonitor networkMonitor, UpdateService updateService, Action onSettingsUpdated)
@@ -157,7 +159,9 @@ namespace MetriX.UI
                 FloatingScale = src.FloatingScale,
                 FloatingLocked = src.FloatingLocked,
                 TopAppsLimit = src.TopAppsLimit,
-                SpeedTestDurationSeconds = src.SpeedTestDurationSeconds
+                SpeedTestDurationSeconds = src.SpeedTestDurationSeconds,
+                DisplayOnlyMode = src.DisplayOnlyMode,
+                DisplayOnlyHotkey = src.DisplayOnlyHotkey
             };
         }
 
@@ -843,6 +847,30 @@ namespace MetriX.UI
             };
             y = AddSettingCard(page, new FluentSettingCard("Start with Windows", "Automatically launch metriX when you log in", _toggleStartWithWindows), y);
 
+            // Card 6: Display-Only Mode (Click-Through HUD)
+            _toggleDisplayOnlyMode = new FluentToggleSwitch();
+            _toggleDisplayOnlyMode.CheckedChanged += (s, e) =>
+            {
+                _workingConfig.DisplayOnlyMode = _toggleDisplayOnlyMode.Checked;
+            };
+            y = AddSettingCard(page, new FluentSettingCard("Display-Only Mode (Click-Through)", "Ignore all mouse clicks so actions pass through to underlying windows", _toggleDisplayOnlyMode), y);
+
+            // Card 7: Display-Only Unlock Hotkey
+            _cbDisplayOnlyHotkey = new FluentDropdown { Width = 280 };
+            _cbDisplayOnlyHotkey.Items.Add("Ctrl + ` (Recommended)");
+            _cbDisplayOnlyHotkey.Items.Add("Ctrl + Shift + `");
+            _cbDisplayOnlyHotkey.Items.Add("Ctrl + Alt + M");
+            _cbDisplayOnlyHotkey.Items.Add("Ctrl + Shift + M");
+            _cbDisplayOnlyHotkey.Items.Add("Ctrl + F12");
+            _cbDisplayOnlyHotkey.Items.Add("Alt + `");
+            _cbDisplayOnlyHotkey.SelectedIndexChanged += (s, e) =>
+            {
+                string[] hotkeys = new string[] { "Ctrl + `", "Ctrl + Shift + `", "Ctrl + Alt + M", "Ctrl + Shift + M", "Ctrl + F12", "Alt + `" };
+                int idx = _cbDisplayOnlyHotkey.SelectedIndex;
+                if (idx >= 0 && idx < hotkeys.Length) _workingConfig.DisplayOnlyHotkey = hotkeys[idx];
+            };
+            y = AddSettingCard(page, new FluentSettingCard("Display-Only Unlock Hotkey", "Global system shortcut to exit click-through mode and restore interactivity", _cbDisplayOnlyHotkey), y);
+
             // Card 6: Application Updates
             var btnCheckUpdates = new Button
             {
@@ -1167,6 +1195,17 @@ namespace MetriX.UI
 
             _stepperDataQuota.Value = (decimal)_workingConfig.MonthlyDataQuotaGb;
             _toggleStartWithWindows.Checked = _workingConfig.StartWithWindows;
+            if (_toggleDisplayOnlyMode != null) _toggleDisplayOnlyMode.Checked = _workingConfig.DisplayOnlyMode;
+            if (_cbDisplayOnlyHotkey != null)
+            {
+                string curHk = _workingConfig.DisplayOnlyHotkey ?? "Ctrl + `";
+                if (curHk == "Ctrl + Shift + `") _cbDisplayOnlyHotkey.SelectedIndex = 1;
+                else if (curHk == "Ctrl + Alt + M") _cbDisplayOnlyHotkey.SelectedIndex = 2;
+                else if (curHk == "Ctrl + Shift + M") _cbDisplayOnlyHotkey.SelectedIndex = 3;
+                else if (curHk == "Ctrl + F12") _cbDisplayOnlyHotkey.SelectedIndex = 4;
+                else if (curHk == "Alt + `") _cbDisplayOnlyHotkey.SelectedIndex = 5;
+                else _cbDisplayOnlyHotkey.SelectedIndex = 0;
+            }
             if (_toggleSilentUpdate != null) _toggleSilentUpdate.Checked = _workingConfig.EnableSilentAutoUpdate;
             if (_toggleFloatingMode != null) _toggleFloatingMode.Checked = _workingConfig.IsFloatingMode;
             if (_toggleFloatingLocked != null) _toggleFloatingLocked.Checked = _workingConfig.FloatingLocked;
@@ -1288,6 +1327,19 @@ namespace MetriX.UI
             if (_toggleSilentUpdate != null)
             {
                 _workingConfig.EnableSilentAutoUpdate = _toggleSilentUpdate.Checked;
+            }
+            if (_toggleDisplayOnlyMode != null)
+            {
+                _workingConfig.DisplayOnlyMode = _toggleDisplayOnlyMode.Checked;
+            }
+            if (_cbDisplayOnlyHotkey != null)
+            {
+                string[] hotkeys = new string[] { "Ctrl + `", "Ctrl + Shift + `", "Ctrl + Alt + M", "Ctrl + Shift + M", "Ctrl + F12", "Alt + `" };
+                int idx = _cbDisplayOnlyHotkey.SelectedIndex;
+                if (idx >= 0 && idx < hotkeys.Length)
+                {
+                    _workingConfig.DisplayOnlyHotkey = hotkeys[idx];
+                }
             }
             if (_toggleFloatingMode != null)
             {

@@ -31,6 +31,7 @@ namespace MetriX.UI
 
         // Context Menu Controls & Items
         private QuickActionBarItem _quickActionBar;
+        private ToolStripMenuItem _itemDisplayOnly;
         private ToolStripMenuItem _itemFloating;
         private ToolStripMenuItem _itemFloatingSize;
         private ToolStripMenuItem _itemFloatingSnap;
@@ -73,6 +74,10 @@ namespace MetriX.UI
         public event Action RequestToggleFlyout;
         public event Action RequestCheckUpdates;
         public event Action RequestExit;
+        public event Action<bool> DisplayOnlyModeToggled;
+
+        private const int DISPLAY_ONLY_HOTKEY_ID = 0x5101;
+        private bool _isHotkeyRegistered = false;
 
         public IntPtr SecondaryTaskbarHandle { get { return _secondaryTaskbarHandle; } }
 
@@ -124,6 +129,101 @@ namespace MetriX.UI
         {
             base.OnHandleCreated(e);
             EnsureTaskbarOwnership();
+            RegisterDisplayOnlyHotkey();
+            ApplyDisplayOnlyMode();
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            UnregisterDisplayOnlyHotkey();
+            base.OnFormClosing(e);
+        }
+
+        public void ToggleDisplayOnlyMode()
+        {
+            var cfg = _configService.Config;
+            cfg.DisplayOnlyMode = !cfg.DisplayOnlyMode;
+            _configService.Save(cfg);
+            ApplyDisplayOnlyMode();
+
+            if (DisplayOnlyModeToggled != null)
+            {
+                DisplayOnlyModeToggled(cfg.DisplayOnlyMode);
+            }
+        }
+
+        public void ApplyDisplayOnlyMode()
+        {
+            if (IsDisposed || !IsHandleCreated) return;
+            try
+            {
+                int exStyle = unchecked((int)(long)NativeMethods.GetWindowLongPtr(Handle, -20)); // GWL_EXSTYLE = -20
+                if (_configService.Config.DisplayOnlyMode)
+                {
+                    exStyle |= NativeMethods.WS_EX_TRANSPARENT;
+                }
+                else
+                {
+                    exStyle &= ~NativeMethods.WS_EX_TRANSPARENT;
+                }
+                NativeMethods.SetWindowLongPtr(Handle, -20, new IntPtr(exStyle));
+                NativeMethods.SetWindowPos(Handle, IntPtr.Zero, 0, 0, 0, 0,
+                    NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOZORDER | NativeMethods.SWP_FRAMECHANGED);
+            }
+            catch { }
+
+            PreLayoutContextMenu();
+        }
+
+        public void RegisterDisplayOnlyHotkey()
+        {
+            if (!IsHandleCreated || _secondaryTaskbarHandle != IntPtr.Zero) return;
+            try
+            {
+                if (_isHotkeyRegistered)
+                {
+                    NativeMethods.UnregisterHotKey(Handle, DISPLAY_ONLY_HOTKEY_ID);
+                    _isHotkeyRegistered = false;
+                }
+
+                string hotkeyStr = _configService.Config.DisplayOnlyHotkey ?? "Ctrl + `";
+                uint modifiers = 0;
+                uint vk = 0xC0; // VK_OEM_3 default (` / ~)
+
+                string[] parts = hotkeyStr.Split(new char[] { '+', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (string p in parts)
+                {
+                    string part = p.Trim().ToLowerInvariant();
+                    if (part == "ctrl" || part == "control") modifiers |= NativeMethods.MOD_CONTROL;
+                    else if (part == "alt") modifiers |= NativeMethods.MOD_ALT;
+                    else if (part == "shift") modifiers |= NativeMethods.MOD_SHIFT;
+                    else if (part == "win" || part == "windows") modifiers |= NativeMethods.MOD_WIN;
+                    else if (part == "`" || part == "~" || part == "backquote" || part == "tilde") vk = 0xC0;
+                    else if (part == "m") vk = 0x4D;
+                    else if (part == "f12") vk = 0x7B;
+                    else if (part == "f11") vk = 0x7A;
+                    else if (part == "f10") vk = 0x79;
+                }
+
+                if (modifiers == 0) modifiers = NativeMethods.MOD_CONTROL;
+                modifiers |= NativeMethods.MOD_NOREPEAT;
+
+                _isHotkeyRegistered = NativeMethods.RegisterHotKey(Handle, DISPLAY_ONLY_HOTKEY_ID, modifiers, vk);
+            }
+            catch { }
+        }
+
+        public void UnregisterDisplayOnlyHotkey()
+        {
+            if (_isHotkeyRegistered && IsHandleCreated)
+            {
+                try
+                {
+                    NativeMethods.UnregisterHotKey(Handle, DISPLAY_ONLY_HOTKEY_ID);
+                }
+                catch { }
+                _isHotkeyRegistered = false;
+            }
         }
 
         public void EnsureTaskbarOwnership()
@@ -231,6 +331,12 @@ namespace MetriX.UI
                 _configService.Save(cfg);
             });
 
+            // Display-Only (Click-Through) mode
+            _itemDisplayOnly = new ToolStripMenuItem("👁️  Display Only Mode", null, (s, e) =>
+            {
+                ToggleDisplayOnlyMode();
+            });
+
             _itemStartup = new ToolStripMenuItem("🚀  Autostart", null, (s, e) =>
             {
                 _configService.Config.StartWithWindows = !_configService.Config.StartWithWindows;
@@ -260,6 +366,7 @@ namespace MetriX.UI
             _contextMenu.Items.Add(_itemFloatingTop);
             _contextMenu.Items.Add(_itemLayout);
             _contextMenu.Items.Add(_itemLock);
+            _contextMenu.Items.Add(_itemDisplayOnly);
             _contextMenu.Items.Add(_itemStartup);
             _contextMenu.Items.Add(new ToolStripSeparator());
             _contextMenu.Items.Add(_itemExit);
@@ -286,6 +393,12 @@ namespace MetriX.UI
 
             _itemLock.Checked = cfg.FloatingLocked;
             _itemLock.Text = cfg.FloatingLocked ? "🔒  Position (Locked)" : "🔒  Lock Position";
+
+            _itemDisplayOnly.Checked = cfg.DisplayOnlyMode;
+            string hk = cfg.DisplayOnlyHotkey ?? "Ctrl + `";
+            _itemDisplayOnly.Text = cfg.DisplayOnlyMode 
+                ? string.Format("👁️  Display Only ({0} to Unlock)", hk) 
+                : "👁️  Display Only Mode";
 
             if (cfg.IsFloatingMode)
             {
@@ -1006,6 +1119,8 @@ namespace MetriX.UI
         {
             base.OnMouseDown(e);
 
+            if (_configService.Config.DisplayOnlyMode) return;
+
             if (e.Button == MouseButtons.Right)
             {
                 NativeMethods.SetForegroundWindow(Handle);
@@ -1098,6 +1213,18 @@ namespace MetriX.UI
 
         protected override void WndProc(ref Message m)
         {
+            if (m.Msg == NativeMethods.WM_HOTKEY && m.WParam.ToInt32() == DISPLAY_ONLY_HOTKEY_ID)
+            {
+                ToggleDisplayOnlyMode();
+                return;
+            }
+
+            if (_configService.Config.DisplayOnlyMode && m.Msg == NativeMethods.WM_NCHITTEST)
+            {
+                m.Result = (IntPtr)NativeMethods.HTTRANSPARENT;
+                return;
+            }
+
             const int WM_MOUSEACTIVATE = 0x0021;
             const int MA_NOACTIVATE = 3;
 

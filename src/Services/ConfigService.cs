@@ -174,6 +174,12 @@ namespace MetriX.Services
                         case "SpeedTestDurationSeconds":
                             int std; if (int.TryParse(val, out std)) config.SpeedTestDurationSeconds = std;
                             break;
+                        case "DisplayOnlyMode":
+                            bool dom; if (bool.TryParse(val, out dom)) config.DisplayOnlyMode = dom;
+                            break;
+                        case "DisplayOnlyHotkey":
+                            config.DisplayOnlyHotkey = val;
+                            break;
                     }
                 }
             }
@@ -238,7 +244,9 @@ namespace MetriX.Services
                     sw.WriteLine("  \"FloatingScale\": " + config.FloatingScale.ToString("F2", System.Globalization.CultureInfo.InvariantCulture) + ",");
                     sw.WriteLine("  \"FloatingLocked\": " + config.FloatingLocked.ToString().ToLowerInvariant() + ",");
                     sw.WriteLine("  \"TopAppsLimit\": " + config.TopAppsLimit + ",");
-                    sw.WriteLine("  \"SpeedTestDurationSeconds\": " + config.SpeedTestDurationSeconds);
+                    sw.WriteLine("  \"SpeedTestDurationSeconds\": " + config.SpeedTestDurationSeconds + ",");
+                    sw.WriteLine("  \"DisplayOnlyMode\": " + config.DisplayOnlyMode.ToString().ToLowerInvariant() + ",");
+                    sw.WriteLine("  \"DisplayOnlyHotkey\": \"" + (config.DisplayOnlyHotkey ?? "Ctrl + `") + "\"");
                     sw.WriteLine("}");
                 }
 

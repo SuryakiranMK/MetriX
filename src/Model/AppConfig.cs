@@ -86,6 +86,8 @@ namespace MetriX.Model
         public bool FloatingLocked { get; set; }
         public int TopAppsLimit { get; set; }
         public int SpeedTestDurationSeconds { get; set; }
+        public bool DisplayOnlyMode { get; set; }
+        public string DisplayOnlyHotkey { get; set; }
 
         public AppConfig()
         {
@@ -137,6 +139,8 @@ namespace MetriX.Model
             FloatingLocked = false;
             TopAppsLimit = 5;
             SpeedTestDurationSeconds = 10;
+            DisplayOnlyMode = false;
+            DisplayOnlyHotkey = "Ctrl + `";
         }
     }
 }
