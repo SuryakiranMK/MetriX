@@ -35,6 +35,9 @@ namespace MetriX.UI
         private FluentNumericStepper _stepperOffsetY;
         private FluentToggleSwitch _toggleAllMonitors;
         private FluentToggleSwitch _toggleFloatingMode;
+        private FluentDropdown _cbFloatingScale;
+        private FluentToggleSwitch _toggleFloatingLocked;
+        private FluentToggleSwitch _toggleFloatingTop;
 
         // Controls - Page 1: Typography & Colors
         private FluentDropdown _cbFont;
@@ -148,7 +151,9 @@ namespace MetriX.UI
                 IsFloatingMode = src.IsFloatingMode,
                 FloatingX = src.FloatingX,
                 FloatingY = src.FloatingY,
-                FloatingAlwaysOnTop = src.FloatingAlwaysOnTop
+                FloatingAlwaysOnTop = src.FloatingAlwaysOnTop,
+                FloatingScale = src.FloatingScale,
+                FloatingLocked = src.FloatingLocked
             };
         }
 
@@ -485,6 +490,44 @@ namespace MetriX.UI
             };
             page.Controls.Add(new FluentSettingCard("Detachable Floating Mini-Widget", "Detach meter from taskbar into a draggable desktop widget", _toggleFloatingMode) { Location = new Point(0, y) });
             y += 72;
+
+            // Card 7: Floating Widget Scale
+            _cbFloatingScale = new FluentDropdown { Width = 240 };
+            _cbFloatingScale.Items.Add("Compact (80%)");
+            _cbFloatingScale.Items.Add("Standard (100%)");
+            _cbFloatingScale.Items.Add("Large (125%)");
+            _cbFloatingScale.Items.Add("Extra Large (150%)");
+            _cbFloatingScale.SelectedIndexChanged += (s, e) =>
+            {
+                switch (_cbFloatingScale.SelectedIndex)
+                {
+                    case 0: _workingConfig.FloatingScale = 0.8; break;
+                    case 1: _workingConfig.FloatingScale = 1.0; break;
+                    case 2: _workingConfig.FloatingScale = 1.25; break;
+                    case 3: _workingConfig.FloatingScale = 1.5; break;
+                }
+                _previewPanel.Invalidate();
+            };
+            page.Controls.Add(new FluentSettingCard("Floating Widget Scale", "Scale sizing of the detached floating mini-widget", _cbFloatingScale) { Location = new Point(0, y) });
+            y += 72;
+
+            // Card 8: Lock Floating Position
+            _toggleFloatingLocked = new FluentToggleSwitch();
+            _toggleFloatingLocked.CheckedChanged += (s, e) =>
+            {
+                _workingConfig.FloatingLocked = _toggleFloatingLocked.Checked;
+            };
+            page.Controls.Add(new FluentSettingCard("Lock Floating Position", "Prevent accidental dragging of the floating widget", _toggleFloatingLocked) { Location = new Point(0, y) });
+            y += 72;
+
+            // Card 9: Always on Top (Floating)
+            _toggleFloatingTop = new FluentToggleSwitch();
+            _toggleFloatingTop.CheckedChanged += (s, e) =>
+            {
+                _workingConfig.FloatingAlwaysOnTop = _toggleFloatingTop.Checked;
+            };
+            page.Controls.Add(new FluentSettingCard("Always on Top (Floating)", "Keep floating widget visible above other desktop applications", _toggleFloatingTop) { Location = new Point(0, y) });
+            y += 72;
         }
 
         private void BuildStyleCards(Panel page)
@@ -786,7 +829,7 @@ namespace MetriX.UI
             };
             btnCheckUpdates.FlatAppearance.BorderSize = 0;
 
-            var cardUpdates = new FluentSettingCard("Application Updates", "metriX v2.9.0 • Up to date", btnCheckUpdates) { Location = new Point(0, y) };
+            var cardUpdates = new FluentSettingCard("Application Updates", "metriX v2.10.0 • Up to date", btnCheckUpdates) { Location = new Point(0, y) };
             btnCheckUpdates.Click += (s, e) =>
             {
                 if (_updateService == null) return;
@@ -1080,6 +1123,15 @@ namespace MetriX.UI
             _toggleStartWithWindows.Checked = _workingConfig.StartWithWindows;
             if (_toggleSilentUpdate != null) _toggleSilentUpdate.Checked = _workingConfig.EnableSilentAutoUpdate;
             if (_toggleFloatingMode != null) _toggleFloatingMode.Checked = _workingConfig.IsFloatingMode;
+            if (_toggleFloatingLocked != null) _toggleFloatingLocked.Checked = _workingConfig.FloatingLocked;
+            if (_toggleFloatingTop != null) _toggleFloatingTop.Checked = _workingConfig.FloatingAlwaysOnTop;
+            if (_cbFloatingScale != null)
+            {
+                if (Math.Abs(_workingConfig.FloatingScale - 0.8) < 0.05) _cbFloatingScale.SelectedIndex = 0;
+                else if (Math.Abs(_workingConfig.FloatingScale - 1.25) < 0.05) _cbFloatingScale.SelectedIndex = 2;
+                else if (Math.Abs(_workingConfig.FloatingScale - 1.5) < 0.05) _cbFloatingScale.SelectedIndex = 3;
+                else _cbFloatingScale.SelectedIndex = 1;
+            }
         }
 
         private void OnPreviewPaint(object sender, PaintEventArgs e)
@@ -1194,6 +1246,24 @@ namespace MetriX.UI
             if (_toggleFloatingMode != null)
             {
                 _workingConfig.IsFloatingMode = _toggleFloatingMode.Checked;
+            }
+            if (_toggleFloatingLocked != null)
+            {
+                _workingConfig.FloatingLocked = _toggleFloatingLocked.Checked;
+            }
+            if (_toggleFloatingTop != null)
+            {
+                _workingConfig.FloatingAlwaysOnTop = _toggleFloatingTop.Checked;
+            }
+            if (_cbFloatingScale != null)
+            {
+                switch (_cbFloatingScale.SelectedIndex)
+                {
+                    case 0: _workingConfig.FloatingScale = 0.8; break;
+                    case 1: _workingConfig.FloatingScale = 1.0; break;
+                    case 2: _workingConfig.FloatingScale = 1.25; break;
+                    case 3: _workingConfig.FloatingScale = 1.5; break;
+                }
             }
             _configService.Save(_workingConfig);
             if (_onSettingsUpdated != null) _onSettingsUpdated();

@@ -151,8 +151,15 @@ namespace MetriX.UI
             var headerPanel = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 44,
+                Height = 46,
                 BackColor = Color.FromArgb(32, 32, 36)
+            };
+            headerPanel.Paint += (s, e) =>
+            {
+                using (var pen = new Pen(Color.FromArgb(44, 44, 48), 1))
+                {
+                    e.Graphics.DrawLine(pen, 0, headerPanel.Height - 1, headerPanel.Width, headerPanel.Height - 1);
+                }
             };
 
             var lblTitle = new Label
@@ -160,7 +167,7 @@ namespace MetriX.UI
                 Text = "metriX",
                 Font = new Font("Segoe UI", 11.0f, FontStyle.Bold),
                 ForeColor = Color.White,
-                Location = new Point(12, 11),
+                Location = new Point(14, 12),
                 AutoSize = true,
                 UseMnemonic = false
             };
@@ -168,9 +175,9 @@ namespace MetriX.UI
             // Segmented View Switcher Pill
             var pnlSegment = new Panel
             {
-                Size = new Size(204, 28),
-                Location = new Point(86, 8),
-                BackColor = Color.FromArgb(24, 24, 28)
+                Size = new Size(196, 28),
+                Location = new Point((Width - 196) / 2, 9),
+                BackColor = Color.FromArgb(22, 22, 26)
             };
             pnlSegment.Paint += (s, e) =>
             {
@@ -184,9 +191,9 @@ namespace MetriX.UI
 
             _tabBtnMonitor = new Button
             {
-                Text = "📈 Live Graph",
+                Text = "📈 Live",
                 Font = new Font("Segoe UI", 8.0f, FontStyle.Bold),
-                Size = new Size(98, 22),
+                Size = new Size(94, 22),
                 Location = new Point(3, 3),
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand,
@@ -195,14 +202,16 @@ namespace MetriX.UI
                 TextAlign = ContentAlignment.MiddleCenter
             };
             _tabBtnMonitor.FlatAppearance.BorderSize = 0;
+            _tabBtnMonitor.FlatAppearance.MouseOverBackColor = Color.FromArgb(44, 44, 50);
+            _tabBtnMonitor.FlatAppearance.MouseDownBackColor = Color.FromArgb(0, 100, 190);
             _tabBtnMonitor.Click += (s, e) => SwitchView(false);
 
             _tabBtnSpeedTest = new Button
             {
-                Text = "⚡ Speed Test",
+                Text = "⚡ Speed",
                 Font = new Font("Segoe UI", 8.0f, FontStyle.Bold),
-                Size = new Size(98, 22),
-                Location = new Point(103, 3),
+                Size = new Size(94, 22),
+                Location = new Point(99, 3),
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand,
                 UseMnemonic = false,
@@ -210,6 +219,8 @@ namespace MetriX.UI
                 TextAlign = ContentAlignment.MiddleCenter
             };
             _tabBtnSpeedTest.FlatAppearance.BorderSize = 0;
+            _tabBtnSpeedTest.FlatAppearance.MouseOverBackColor = Color.FromArgb(44, 44, 50);
+            _tabBtnSpeedTest.FlatAppearance.MouseDownBackColor = Color.FromArgb(0, 100, 190);
             _tabBtnSpeedTest.Click += (s, e) => SwitchView(true);
 
             pnlSegment.Controls.Add(_tabBtnMonitor);
@@ -218,17 +229,20 @@ namespace MetriX.UI
             var btnClose = new Button
             {
                 Text = "✕",
-                Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
-                ForeColor = Color.FromArgb(180, 180, 180),
+                Font = new Font("Segoe UI", 11.0f, FontStyle.Regular),
+                ForeColor = Color.FromArgb(180, 180, 185),
                 BackColor = Color.Transparent,
                 FlatStyle = FlatStyle.Flat,
-                Size = new Size(28, 28),
-                Location = new Point(Width - 36, 8),
+                Size = new Size(34, 30),
+                Location = new Point(Width - 44, 8),
                 Cursor = Cursors.Hand,
                 UseMnemonic = false
             };
             btnClose.FlatAppearance.BorderSize = 0;
-            btnClose.FlatAppearance.MouseOverBackColor = Color.FromArgb(60, 60, 64);
+            btnClose.FlatAppearance.MouseOverBackColor = Color.FromArgb(232, 17, 35);
+            btnClose.FlatAppearance.MouseDownBackColor = Color.FromArgb(200, 15, 30);
+            btnClose.MouseEnter += (s, e) => { btnClose.ForeColor = Color.White; };
+            btnClose.MouseLeave += (s, e) => { btnClose.ForeColor = Color.FromArgb(180, 180, 185); };
             btnClose.Click += (s, e) => Hide();
 
             headerPanel.Controls.Add(lblTitle);
@@ -239,8 +253,8 @@ namespace MetriX.UI
             // Container 1: Live Monitor View
             _panelMonitor = new Panel
             {
-                Location = new Point(0, 44),
-                Size = new Size(Width, 446),
+                Location = new Point(0, 46),
+                Size = new Size(Width, 444),
                 BackColor = Color.FromArgb(28, 28, 30)
             };
             BuildMonitorView(_panelMonitor);
@@ -249,8 +263,8 @@ namespace MetriX.UI
             // Container 2: Speed Test View
             _panelSpeedTest = new Panel
             {
-                Location = new Point(0, 44),
-                Size = new Size(Width, 446),
+                Location = new Point(0, 46),
+                Size = new Size(Width, 444),
                 BackColor = Color.FromArgb(28, 28, 30),
                 Visible = false
             };
@@ -547,11 +561,11 @@ namespace MetriX.UI
             container.Controls.Add(cardUsage);
 
             // Card 2: Active Connection & Session Telemetry
-            int cardY = 256;
+            int cardY = 250;
             var cardSession = new Panel
             {
                 Location = new Point(14, cardY),
-                Size = new Size(w, 180),
+                Size = new Size(w, 188),
                 BackColor = Color.FromArgb(34, 34, 38),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
@@ -578,8 +592,8 @@ namespace MetriX.UI
                 Text = "Adapter: Detecting...",
                 Font = new Font("Segoe UI", 8.0f, FontStyle.Regular),
                 ForeColor = Color.White,
-                Location = new Point(10, 24),
-                Size = new Size(w - 20, 18),
+                Location = new Point(10, 22),
+                Size = new Size(w - 20, 16),
                 UseMnemonic = false
             };
 
@@ -588,8 +602,8 @@ namespace MetriX.UI
                 Text = "Session: ▲ 0 B  |  ▼ 0 B  (00:00:00)",
                 Font = new Font("Segoe UI", 8.0f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(215, 215, 220),
-                Location = new Point(10, 44),
-                Size = new Size(w - 20, 18),
+                Location = new Point(10, 38),
+                Size = new Size(w - 20, 16),
                 UseMnemonic = false
             };
 
@@ -598,15 +612,15 @@ namespace MetriX.UI
                 Text = "Data Quota: Unlimited",
                 Font = new Font("Segoe UI", 7.5f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(100, 200, 255),
-                Location = new Point(10, 64),
-                Size = new Size(w - 20, 18),
+                Location = new Point(10, 54),
+                Size = new Size(w - 20, 16),
                 UseMnemonic = false
             };
 
             _quotaProgressBar = new Panel
             {
-                Location = new Point(10, 84),
-                Size = new Size(w - 20, 5),
+                Location = new Point(10, 71),
+                Size = new Size(w - 20, 4),
                 BackColor = Color.FromArgb(24, 24, 28),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
@@ -639,8 +653,8 @@ namespace MetriX.UI
 
             _pnlTopApps = new DoubleBufferedPanel
             {
-                Location = new Point(10, 94),
-                Size = new Size(w - 20, 78),
+                Location = new Point(10, 78),
+                Size = new Size(w - 20, 104),
                 BackColor = Color.Transparent,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
@@ -1220,13 +1234,13 @@ namespace MetriX.UI
             int w = _pnlTopApps.ClientSize.Width;
             int h = _pnlTopApps.ClientSize.Height;
 
-            // Header line: "TOP NETWORK APPS"
+            // Header line: "TOP NETWORK APPS & LIVE CONSUMPTION"
             using (var titleFont = new Font("Segoe UI", 7.0f, FontStyle.Bold))
             using (var titleBrush = new SolidBrush(Color.FromArgb(150, 150, 155)))
             using (var dotBrush = new SolidBrush(Color.FromArgb(76, 194, 255)))
             {
                 g.FillEllipse(dotBrush, 0, 3, 5, 5);
-                g.DrawString("TOP NETWORK APPS", titleFont, titleBrush, 9, 0);
+                g.DrawString("TOP NETWORK APPS & LIVE CONSUMPTION", titleFont, titleBrush, 9, 0);
             }
 
             if (_currentTopApps == null || _currentTopApps.Count == 0)
@@ -1239,72 +1253,101 @@ namespace MetriX.UI
                 return;
             }
 
-            // Draw up to 4 app pills in a 2x2 grid
             int count = Math.Min(4, _currentTopApps.Count);
-            int maxConns = 1;
-            foreach (var app in _currentTopApps)
-            {
-                if (app.ActiveConnections > maxConns) maxConns = app.ActiveConnections;
-            }
+            int totalConns = 0;
+            for (int j = 0; j < count; j++) totalConns += _currentTopApps[j].ActiveConnections;
+            if (totalConns <= 0) totalConns = 1;
 
-            int gap = 6;
-            int colW = (w - gap) / 2;
-            int pillH = 26;
+            var stats = _networkMonitor != null ? _networkMonitor.CurrentStats : null;
+            double totalBandwidth = stats != null ? (stats.DownloadSpeedBytesPerSec + stats.UploadSpeedBytesPerSec) : 0;
+
+            int rowH = 20;
+            int gap = 2;
+            int startY = 16;
 
             using (var nameFont = new Font("Segoe UI", 8.0f, FontStyle.Bold))
-            using (var badgeFont = new Font("Segoe UI", 7.0f, FontStyle.Bold))
+            using (var rateFont = new Font("Segoe UI", 7.5f, FontStyle.Bold))
+            using (var badgeFont = new Font("Segoe UI", 7.0f, FontStyle.Regular))
             using (var iconFont = new Font("Segoe UI Emoji", 8.0f, FontStyle.Regular))
-            using (var pillBg = new SolidBrush(Color.FromArgb(40, 40, 46)))
-            using (var pillBorder = new Pen(Color.FromArgb(58, 58, 66), 1))
+            using (var rowBg = new SolidBrush(Color.FromArgb(38, 38, 44)))
+            using (var rowBorder = new Pen(Color.FromArgb(52, 52, 60), 1))
             using (var nameBrush = new SolidBrush(Color.FromArgb(235, 235, 240)))
             using (var badgeBg = new SolidBrush(Color.FromArgb(24, 60, 95)))
             using (var badgeText = new SolidBrush(Color.FromArgb(76, 194, 255)))
+            using (var rateBrushActive = new SolidBrush(Color.FromArgb(108, 203, 95)))
+            using (var rateBrushIdle = new SolidBrush(Color.FromArgb(160, 160, 165)))
             using (var barBrush = new SolidBrush(Color.FromArgb(0, 120, 215)))
             {
                 for (int i = 0; i < count; i++)
                 {
                     var app = _currentTopApps[i];
-                    int col = i % 2;
-                    int row = i / 2;
-                    int px = col * (colW + gap);
-                    int py = 16 + (row * (pillH + 4));
+                    int py = startY + (i * (rowH + gap));
 
-                    Rectangle pillRect = new Rectangle(px, py, colW, pillH);
-                    using (var path = GetRoundedRect(pillRect.X, pillRect.Y, pillRect.Width - 1, pillRect.Height - 1, 4))
+                    // Full-width row container
+                    using (var path = GetRoundedRect(0, py, w - 1, rowH - 1, 3))
                     {
-                        g.FillPath(pillBg, path);
-                        g.DrawPath(pillBorder, path);
+                        g.FillPath(rowBg, path);
+                        g.DrawPath(rowBorder, path);
                     }
 
-                    // Mini activity bar at bottom of pill
-                    int barW = Math.Max(4, (int)((colW - 8) * (app.ActiveConnections / (float)maxConns)));
-                    g.FillRectangle(barBrush, px + 4, py + pillH - 2, barW, 2);
+                    // Activity indicator bar along bottom of row
+                    double connRatio = app.ActiveConnections / (double)totalConns;
+                    int barW = Math.Max(4, (int)((w - 4) * connRatio));
+                    g.FillRectangle(barBrush, 2, py + rowH - 2, barW, 2);
 
-                    // App icon glyph
+                    // Category Icon (X = 6)
                     string icon = GetAppCategoryIcon(app.ProcessName);
-                    g.DrawString(icon, iconFont, nameBrush, px + 5, py + 4);
+                    g.DrawString(icon, iconFont, nameBrush, 6, py + 2);
 
-                    // Badge (e.g. "12") on right
-                    string badge = app.ActiveConnections.ToString();
+                    // Socket count badge (e.g. "10 conn")
+                    string badge = string.Format("{0} conn", app.ActiveConnections);
                     SizeF badgeSz = g.MeasureString(badge, badgeFont);
                     int bw = (int)Math.Ceiling(badgeSz.Width) + 8;
-                    int bx = px + colW - bw - 4;
-                    int by = py + 4;
-                    using (var bPath = GetRoundedRect(bx, by, bw, 16, 3))
-                    {
-                        g.FillPath(badgeBg, bPath);
-                    }
-                    g.DrawString(badge, badgeFont, badgeText, bx + 4, by + 1);
 
-                    // Process Name
-                    int maxNameW = bx - (px + 24) - 2;
+                    // Real-time Bandwidth Consumption (right-aligned)
+                    double appSpeed = totalBandwidth * connRatio;
+                    string rateText;
+                    Brush currentRateBrush;
+                    if (totalBandwidth > 1024)
+                    {
+                        rateText = string.Format("{0} ({1:F0}%)", FormatRate(appSpeed), connRatio * 100.0);
+                        currentRateBrush = rateBrushActive;
+                    }
+                    else
+                    {
+                        rateText = string.Format("{0:F0}% activity", connRatio * 100.0);
+                        currentRateBrush = rateBrushIdle;
+                    }
+                    SizeF rateSz = g.MeasureString(rateText, rateFont);
+                    float rx = w - rateSz.Width - 8;
+                    g.DrawString(rateText, rateFont, currentRateBrush, rx, py + 3);
+
+                    // App Name (between icon and socket badge)
+                    float nameX = 26;
+                    int maxNameW = (int)(rx - bw - 18 - nameX);
                     string displayName = app.ProcessName;
                     SizeF nameSz = g.MeasureString(displayName, nameFont);
-                    if (nameSz.Width > maxNameW && displayName.Length > 8)
+                    if (maxNameW > 20 && nameSz.Width > maxNameW)
                     {
-                        displayName = displayName.Substring(0, Math.Min(displayName.Length, 7)) + "…";
+                        while (displayName.Length > 3 && g.MeasureString(displayName + "…", nameFont).Width > maxNameW)
+                        {
+                            displayName = displayName.Substring(0, displayName.Length - 1);
+                        }
+                        displayName += "…";
+                        nameSz = g.MeasureString(displayName, nameFont);
                     }
-                    g.DrawString(displayName, nameFont, nameBrush, px + 23, py + 4);
+                    g.DrawString(displayName, nameFont, nameBrush, nameX, py + 2);
+
+                    // Draw socket badge pill right after name
+                    int bx = (int)(nameX + nameSz.Width + 6);
+                    if (bx + bw < rx - 4)
+                    {
+                        using (var bPath = GetRoundedRect(bx, py + 2, bw, 15, 3))
+                        {
+                            g.FillPath(badgeBg, bPath);
+                        }
+                        g.DrawString(badge, badgeFont, badgeText, bx + 4, py + 2);
+                    }
                 }
             }
         }

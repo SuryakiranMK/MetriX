@@ -82,6 +82,8 @@ namespace MetriX.Model
         public int FloatingX { get; set; }
         public int FloatingY { get; set; }
         public bool FloatingAlwaysOnTop { get; set; }
+        public double FloatingScale { get; set; }
+        public bool FloatingLocked { get; set; }
 
         public AppConfig()
         {
@@ -129,6 +131,8 @@ namespace MetriX.Model
             FloatingX = -1;
             FloatingY = -1;
             FloatingAlwaysOnTop = true;
+            FloatingScale = 1.0;
+            FloatingLocked = false;
         }
     }
 }

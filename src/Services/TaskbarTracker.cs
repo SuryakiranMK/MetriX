@@ -17,6 +17,7 @@ namespace MetriX.Services
         private NativeMethods.RECT _lastValidTaskbarRect;
         private NativeMethods.RECT _lastValidTrayRect;
         private NativeMethods.RECT _lastValidTaskListRect;
+        private Rectangle _lastValidCalculatedBounds = Rectangle.Empty;
         private DateTime _lastRefresh = DateTime.MinValue;
         private bool _isTaskbarHidden;
 
@@ -80,8 +81,11 @@ namespace MetriX.Services
             {
                 int targetX = secRect.Right - widgetWidth - 16;
                 int targetY = secRect.Top + (secRect.Height - widgetHeight) / 2;
-                return new Rectangle(targetX, targetY, widgetWidth, widgetHeight);
+                var result = new Rectangle(targetX, targetY, widgetWidth, widgetHeight);
+                _lastValidCalculatedBounds = result;
+                return result;
             }
+            if (!_lastValidCalculatedBounds.IsEmpty) return _lastValidCalculatedBounds;
             return Rectangle.Empty;
         }
 
@@ -95,29 +99,7 @@ namespace MetriX.Services
             NativeMethods.RECT tbRect = new NativeMethods.RECT();
             bool hasTb = _hTaskbar != IntPtr.Zero && NativeMethods.GetWindowRect(_hTaskbar, out tbRect);
 
-            // Windows 10/11 Auto-Hide Edge Detection
             Screen scr = Screen.PrimaryScreen;
-            bool isRetracted = false;
-            if (hasTb)
-            {
-                if (tbRect.Height <= 6 || tbRect.Width <= 6)
-                {
-                    isRetracted = true;
-                }
-                else if (scr != null)
-                {
-                    if (tbRect.Top >= scr.Bounds.Bottom - 4) isRetracted = true;
-                    else if (tbRect.Bottom <= scr.Bounds.Top + 4) isRetracted = true;
-                    else if (tbRect.Right <= scr.Bounds.Left + 4) isRetracted = true;
-                    else if (tbRect.Left >= scr.Bounds.Right - 4) isRetracted = true;
-                }
-            }
-
-            _isTaskbarHidden = isRetracted;
-            if (isRetracted)
-            {
-                return Rectangle.Empty;
-            }
 
             if (hasTb && tbRect.Width > 100 && tbRect.Height > 10)
             {
@@ -191,7 +173,8 @@ namespace MetriX.Services
                 case PositionMode.Custom:
                     targetX = (config != null ? config.OffsetX : (tbRect.Right - widgetWidth - 200));
                     targetY = tbRect.Top + (config != null ? config.OffsetY : (tbRect.Height - widgetHeight) / 2);
-                    return new Rectangle(targetX, targetY, widgetWidth, widgetHeight);
+                    _lastValidCalculatedBounds = new Rectangle(targetX, targetY, widgetWidth, widgetHeight);
+                    return _lastValidCalculatedBounds;
 
                 case PositionMode.LeftOfTray:
                 default:
@@ -219,7 +202,8 @@ namespace MetriX.Services
             if (targetX < tbRect.Left) targetX = tbRect.Left;
             if (targetX + widgetWidth > tbRect.Right) targetX = tbRect.Right - widgetWidth;
 
-            return new Rectangle(targetX, targetY, widgetWidth, widgetHeight);
+            _lastValidCalculatedBounds = new Rectangle(targetX, targetY, widgetWidth, widgetHeight);
+            return _lastValidCalculatedBounds;
         }
 
         public bool HasPositionChanged()

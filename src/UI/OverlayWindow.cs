@@ -27,6 +27,7 @@ namespace MetriX.UI
         private ContextMenuStrip _contextMenu;
         private NativeMethods.HookProc _mouseHookProc;
         private IntPtr _hMouseHook = IntPtr.Zero;
+        private Rectangle _lastRenderedBounds = Rectangle.Empty;
 
         public event Action RequestOpenSettings;
         public event Action RequestToggleFlyout;
@@ -90,28 +91,14 @@ namespace MetriX.UI
             try
             {
                 if (!IsHandleCreated) return;
-                var cfg = _configService.Config;
-                if (cfg.IsFloatingMode)
+                // Keep OverlayWindow an independent HWND_TOPMOST window (GWLP_HWNDPARENT = 0).
+                // Setting GWLP_HWNDPARENT to Shell_TrayWnd subordinates the window z-order,
+                // which allows Windows 11 to hide the meter whenever taskbar thumbnail previews appear
+                // or during Show Desktop (Win+D).
+                IntPtr currentOwner = NativeMethods.GetWindowLongPtr(Handle, NativeMethods.GWLP_HWNDPARENT);
+                if (currentOwner != IntPtr.Zero)
                 {
-                    IntPtr currentOwner = NativeMethods.GetWindowLongPtr(Handle, NativeMethods.GWLP_HWNDPARENT);
-                    if (currentOwner != IntPtr.Zero)
-                    {
-                        NativeMethods.SetWindowLongPtr(Handle, NativeMethods.GWLP_HWNDPARENT, IntPtr.Zero);
-                    }
-                    return;
-                }
-
-                IntPtr hTaskbar = _secondaryTaskbarHandle != IntPtr.Zero
-                    ? _secondaryTaskbarHandle
-                    : (_taskbarTracker != null ? _taskbarTracker.TaskbarHandle : IntPtr.Zero);
-
-                if (hTaskbar != IntPtr.Zero)
-                {
-                    IntPtr currentOwner = NativeMethods.GetWindowLongPtr(Handle, NativeMethods.GWLP_HWNDPARENT);
-                    if (currentOwner != hTaskbar)
-                    {
-                        NativeMethods.SetWindowLongPtr(Handle, NativeMethods.GWLP_HWNDPARENT, hTaskbar);
-                    }
+                    NativeMethods.SetWindowLongPtr(Handle, NativeMethods.GWLP_HWNDPARENT, IntPtr.Zero);
                 }
             }
             catch { }
@@ -146,6 +133,30 @@ namespace MetriX.UI
                 EnsureTaskbarOwnership();
                 RenderFrame();
             });
+
+            // Floating Customization Submenus
+            var itemFloatingSize = new ToolStripMenuItem("📐  Widget Size");
+            itemFloatingSize.DropDown.Renderer = new Windows11MenuRenderer();
+            var itemSizeCompact = new ToolStripMenuItem("Compact (80%)", null, (s, e) => SetFloatingScale(0.8));
+            var itemSizeNormal = new ToolStripMenuItem("Standard (100%)", null, (s, e) => SetFloatingScale(1.0));
+            var itemSizeLarge = new ToolStripMenuItem("Large (125%)", null, (s, e) => SetFloatingScale(1.25));
+            var itemSizeXLarge = new ToolStripMenuItem("Extra Large (150%)", null, (s, e) => SetFloatingScale(1.5));
+            itemFloatingSize.DropDownItems.AddRange(new ToolStripItem[] { itemSizeCompact, itemSizeNormal, itemSizeLarge, itemSizeXLarge });
+
+            var itemFloatingLock = new ToolStripMenuItem("🔒  Lock Position", null, (s, e) =>
+            {
+                var cfg = _configService.Config;
+                cfg.FloatingLocked = !cfg.FloatingLocked;
+                _configService.Save(cfg);
+            });
+
+            var itemFloatingSnap = new ToolStripMenuItem("📍  Snap to Corner");
+            itemFloatingSnap.DropDown.Renderer = new Windows11MenuRenderer();
+            var itemSnapBR = new ToolStripMenuItem("Bottom-Right", null, (s, e) => SnapFloatingToCorner(2));
+            var itemSnapTR = new ToolStripMenuItem("Top-Right", null, (s, e) => SnapFloatingToCorner(1));
+            var itemSnapBL = new ToolStripMenuItem("Bottom-Left", null, (s, e) => SnapFloatingToCorner(4));
+            var itemSnapTL = new ToolStripMenuItem("Top-Left", null, (s, e) => SnapFloatingToCorner(3));
+            itemFloatingSnap.DropDownItems.AddRange(new ToolStripItem[] { itemSnapBR, itemSnapTR, itemSnapBL, itemSnapTL });
 
             var itemLayout = new ToolStripMenuItem("🔄  Display Layout");
             itemLayout.DropDown.Renderer = new Windows11MenuRenderer();
@@ -183,6 +194,19 @@ namespace MetriX.UI
                 itemPosition.Enabled = !cfg.IsFloatingMode;
                 itemStartup.Checked = cfg.StartWithWindows;
                 itemFloating.Text = cfg.IsFloatingMode ? "📌  Dock back to Taskbar" : "📌  Detach to Floating Widget";
+
+                itemFloatingSize.Visible = cfg.IsFloatingMode;
+                itemFloatingLock.Visible = cfg.IsFloatingMode;
+                itemFloatingSnap.Visible = cfg.IsFloatingMode;
+
+                if (cfg.IsFloatingMode)
+                {
+                    itemFloatingLock.Text = cfg.FloatingLocked ? "🔓  Unlock Position" : "🔒  Lock Position";
+                    itemSizeCompact.Checked = Math.Abs(cfg.FloatingScale - 0.8) < 0.05;
+                    itemSizeNormal.Checked = Math.Abs(cfg.FloatingScale - 1.0) < 0.05;
+                    itemSizeLarge.Checked = Math.Abs(cfg.FloatingScale - 1.25) < 0.05;
+                    itemSizeXLarge.Checked = Math.Abs(cfg.FloatingScale - 1.5) < 0.05;
+                }
             };
 
             _contextMenu.Opened += OnContextMenuOpened;
@@ -193,11 +217,51 @@ namespace MetriX.UI
             _contextMenu.Items.Add(itemUpdates);
             _contextMenu.Items.Add(new ToolStripSeparator());
             _contextMenu.Items.Add(itemFloating);
+            _contextMenu.Items.Add(itemFloatingSize);
+            _contextMenu.Items.Add(itemFloatingLock);
+            _contextMenu.Items.Add(itemFloatingSnap);
             _contextMenu.Items.Add(itemLayout);
             _contextMenu.Items.Add(itemPosition);
             _contextMenu.Items.Add(itemStartup);
             _contextMenu.Items.Add(new ToolStripSeparator());
             _contextMenu.Items.Add(itemExit);
+        }
+
+        private void SetFloatingScale(double scale)
+        {
+            var cfg = _configService.Config;
+            cfg.FloatingScale = scale;
+            _configService.Save(cfg);
+            RenderFrame();
+        }
+
+        private void SnapFloatingToCorner(int corner)
+        {
+            var cfg = _configService.Config;
+            Screen scr = Screen.FromPoint(Location);
+            Rectangle wa = scr.WorkingArea;
+            int margin = 20;
+            switch (corner)
+            {
+                case 1: // Top-Right
+                    cfg.FloatingX = wa.Right - Width - margin;
+                    cfg.FloatingY = wa.Top + margin;
+                    break;
+                case 2: // Bottom-Right
+                    cfg.FloatingX = wa.Right - Width - margin;
+                    cfg.FloatingY = wa.Bottom - Height - margin;
+                    break;
+                case 3: // Top-Left
+                    cfg.FloatingX = wa.Left + margin;
+                    cfg.FloatingY = wa.Top + margin;
+                    break;
+                case 4: // Bottom-Left
+                    cfg.FloatingX = wa.Left + margin;
+                    cfg.FloatingY = wa.Bottom - Height - margin;
+                    break;
+            }
+            _configService.Save(cfg);
+            RenderFrame();
         }
 
         private void OnContextMenuOpened(object sender, EventArgs e)
@@ -358,17 +422,27 @@ namespace MetriX.UI
                 bounds = _taskbarTracker.CalculateSecondaryBounds(_secondaryTaskbarHandle, width, height);
                 if (bounds.IsEmpty)
                 {
-                    if (Visible) Visible = false;
-                    return;
+                    if (!_lastRenderedBounds.IsEmpty) bounds = _lastRenderedBounds;
+                    else return;
                 }
             }
             else
             {
                 bounds = _taskbarTracker.CalculateBounds(cfg, width, height);
-                if (bounds.IsEmpty || (_taskbarTracker != null && _taskbarTracker.IsTaskbarHidden))
+                if (bounds.IsEmpty)
                 {
-                    if (Visible) Visible = false;
-                    return;
+                    if (!_lastRenderedBounds.IsEmpty)
+                    {
+                        bounds = _lastRenderedBounds;
+                    }
+                    else
+                    {
+                        Rectangle wa = Screen.PrimaryScreen.WorkingArea;
+                        Rectangle boundsScr = Screen.PrimaryScreen.Bounds;
+                        int tbHeight = boundsScr.Bottom - wa.Bottom;
+                        if (tbHeight <= 0) tbHeight = 48;
+                        bounds = new Rectangle(wa.Right - width - 120, boundsScr.Bottom - tbHeight + ((tbHeight - height) / 2), width, height);
+                    }
                 }
             }
 
@@ -383,15 +457,17 @@ namespace MetriX.UI
 
         private void MeasureDimensions(AppConfig cfg, NetworkStats stats, float dpiScale, out int width, out int height)
         {
-            int baseHeight = cfg.IsFloatingMode ? DpiHelper.Scale(36, dpiScale) : DpiHelper.Scale(40, dpiScale); // Taskbar height is 48px
-            int padX = DpiHelper.Scale(cfg.PaddingX, dpiScale);
-            int padY = DpiHelper.Scale(cfg.PaddingY, dpiScale);
+            double scale = cfg.IsFloatingMode ? Math.Max(0.5, Math.Min(2.5, cfg.FloatingScale > 0 ? cfg.FloatingScale : 1.0)) : 1.0;
+            int baseHeight = cfg.IsFloatingMode ? (int)(DpiHelper.Scale(36, dpiScale) * scale) : DpiHelper.Scale(40, dpiScale); // Taskbar height is 48px
+            int padX = (int)(DpiHelper.Scale(cfg.PaddingX, dpiScale) * scale);
+            int padY = (int)(DpiHelper.Scale(cfg.PaddingY, dpiScale) * scale);
 
             string fontName = string.IsNullOrEmpty(cfg.FontFamily) ? "Segoe UI Variable Text" : cfg.FontFamily;
             FontStyle style = cfg.FontBold ? FontStyle.Bold : FontStyle.Regular;
-            float unitSizePt = cfg.UnitFontSize > 0 ? cfg.UnitFontSize : Math.Max(6.0f, cfg.FontSize * 0.8f);
+            float scaledFontSize = (float)(cfg.FontSize * scale);
+            float unitSizePt = (float)((cfg.UnitFontSize > 0 ? cfg.UnitFontSize : Math.Max(6.0f, cfg.FontSize * 0.8f)) * scale);
 
-            using (Font font = CreateFontSafely(fontName, cfg.FontSize * dpiScale, style))
+            using (Font font = CreateFontSafely(fontName, scaledFontSize * dpiScale, style))
             using (Font unitFont = CreateFontSafely(fontName, unitSizePt * dpiScale, FontStyle.Regular))
             using (Bitmap dummyBmp = new Bitmap(1, 1))
             using (Graphics g = Graphics.FromImage(dummyBmp))
@@ -425,11 +501,11 @@ namespace MetriX.UI
 
             if (cfg.IsFloatingMode)
             {
-                width += DpiHelper.Scale(12, dpiScale);
+                width += (int)(DpiHelper.Scale(12, dpiScale) * scale);
             }
 
             // Minimum width safeguard
-            width = Math.Max(width, DpiHelper.Scale(50, dpiScale));
+            width = Math.Max(width, (int)(DpiHelper.Scale(50, dpiScale) * scale));
         }
 
         private void DrawLayeredFrame(Rectangle bounds, int width, int height, AppConfig cfg, NetworkStats stats, float dpiScale)
@@ -500,11 +576,13 @@ namespace MetriX.UI
                         }
                     }
 
+                    double scale = cfg.IsFloatingMode ? Math.Max(0.5, Math.Min(2.5, cfg.FloatingScale > 0 ? cfg.FloatingScale : 1.0)) : 1.0;
                     string fontName = string.IsNullOrEmpty(cfg.FontFamily) ? "Segoe UI Variable Text" : cfg.FontFamily;
                     FontStyle style = cfg.FontBold ? FontStyle.Bold : FontStyle.Regular;
-                    float unitSizePt = cfg.UnitFontSize > 0 ? cfg.UnitFontSize : Math.Max(6.0f, cfg.FontSize * 0.8f);
+                    float scaledFontSize = (float)(cfg.FontSize * scale);
+                    float unitSizePt = (float)((cfg.UnitFontSize > 0 ? cfg.UnitFontSize : Math.Max(6.0f, cfg.FontSize * 0.8f)) * scale);
 
-                    using (Font font = CreateFontSafely(fontName, cfg.FontSize * dpiScale, style))
+                    using (Font font = CreateFontSafely(fontName, scaledFontSize * dpiScale, style))
                     using (Font unitFont = CreateFontSafely(fontName, unitSizePt * dpiScale, FontStyle.Regular))
                     {
                         Color upColor, dnColor, lblColor;
@@ -526,7 +604,7 @@ namespace MetriX.UI
                         string upArrow = GetArrowGlyph(cfg.ArrowStyle, true);
                         string dnArrow = GetArrowGlyph(cfg.ArrowStyle, false);
 
-                        int padX = DpiHelper.Scale(cfg.PaddingX, dpiScale);
+                        int padX = (int)(DpiHelper.Scale(cfg.PaddingX, dpiScale) * scale);
 
                         if (cfg.Layout == LayoutMode.Stacked)
                         {
@@ -569,9 +647,13 @@ namespace MetriX.UI
                     ref blend,
                     NativeMethods.ULW_ALPHA);
 
-                // Ensure it stays at topmost taskbar layer without stealing focus
-                NativeMethods.SetWindowPos(Handle, NativeMethods.HWND_TOPMOST, bounds.X, bounds.Y, width, height,
-                    NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_SHOWWINDOW);
+                // Only reposition window if bounds changed to eliminate DWM recomposition flicker
+                if (bounds != _lastRenderedBounds || !Visible)
+                {
+                    NativeMethods.SetWindowPos(Handle, NativeMethods.HWND_TOPMOST, bounds.X, bounds.Y, width, height,
+                        NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_SHOWWINDOW);
+                    _lastRenderedBounds = bounds;
+                }
             }
             finally
             {
@@ -742,16 +824,43 @@ namespace MetriX.UI
             if (e.Button == MouseButtons.Right)
             {
                 NativeMethods.SetForegroundWindow(Handle);
-                _contextMenu.Show(Cursor.Position);
+                var cfg = _configService.Config;
+                if (cfg.IsFloatingMode)
+                {
+                    Screen scr = Screen.FromPoint(Location);
+                    Rectangle wa = scr.WorkingArea;
+                    int menuW = Math.Max(220, _contextMenu.PreferredSize.Width);
+                    int menuH = Math.Max(260, _contextMenu.PreferredSize.Height);
+
+                    int posX = Location.X;
+                    if (posX + menuW > wa.Right) posX = wa.Right - menuW;
+                    if (posX < wa.Left) posX = wa.Left;
+
+                    int posY = Location.Y + Height + 4;
+                    if (posY + menuH > wa.Bottom)
+                    {
+                        posY = Location.Y - menuH - 4;
+                        if (posY < wa.Top) posY = wa.Bottom - menuH;
+                    }
+
+                    _contextMenu.Show(new Point(posX, posY));
+                }
+                else
+                {
+                    _contextMenu.Show(Cursor.Position);
+                }
             }
             else if (e.Button == MouseButtons.Left)
             {
                 var cfg = _configService.Config;
                 if (cfg.IsFloatingMode)
                 {
-                    _isDragging = true;
-                    _dragStartPoint = Cursor.Position;
-                    _initialWindowLocation = new Point(cfg.FloatingX, cfg.FloatingY);
+                    if (!cfg.FloatingLocked)
+                    {
+                        _isDragging = true;
+                        _dragStartPoint = Cursor.Position;
+                        _initialWindowLocation = new Point(cfg.FloatingX, cfg.FloatingY);
+                    }
                 }
                 else if ((Control.ModifierKeys & Keys.Control) == Keys.Control)
                 {
@@ -845,8 +954,8 @@ namespace MetriX.UI
 
                     // Show Desktop Anti-Flicker Immunity:
                     // Windows shell sends SWP_HIDEWINDOW when clicking the far-right taskbar line ("Show Desktop") or Win+D.
-                    // If docked on a visible taskbar, strip SWP_HIDEWINDOW and ensure SWP_SHOWWINDOW so the meter never flickers or disappears.
-                    if (!_configService.Config.IsFloatingMode && (_taskbarTracker == null || !_taskbarTracker.IsTaskbarHidden))
+                    // If docked on a taskbar, strip SWP_HIDEWINDOW and ensure SWP_SHOWWINDOW so the meter NEVER disappears.
+                    if (!_configService.Config.IsFloatingMode)
                     {
                         if ((wp.flags & NativeMethods.SWP_HIDEWINDOW) != 0)
                         {
@@ -867,7 +976,7 @@ namespace MetriX.UI
             if (m.Msg == NativeMethods.WM_SHOWWINDOW)
             {
                 // Suppress hide request dispatched by Show Desktop / Win+D
-                if (m.WParam == IntPtr.Zero && !_configService.Config.IsFloatingMode && (_taskbarTracker == null || !_taskbarTracker.IsTaskbarHidden))
+                if (m.WParam == IntPtr.Zero && !_configService.Config.IsFloatingMode)
                 {
                     m.Result = IntPtr.Zero;
                     return;
