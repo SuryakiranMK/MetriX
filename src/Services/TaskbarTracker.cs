@@ -18,8 +18,10 @@ namespace MetriX.Services
         private NativeMethods.RECT _lastValidTrayRect;
         private NativeMethods.RECT _lastValidTaskListRect;
         private DateTime _lastRefresh = DateTime.MinValue;
+        private bool _isTaskbarHidden;
 
         public bool IsTaskbarFound { get { return _hTaskbar != IntPtr.Zero; } }
+        public bool IsTaskbarHidden { get { return _isTaskbarHidden; } }
         public List<IntPtr> SecondaryTaskbars { get { return _secondaryTaskbars; } }
 
         public IntPtr TaskbarHandle
@@ -92,6 +94,31 @@ namespace MetriX.Services
 
             NativeMethods.RECT tbRect = new NativeMethods.RECT();
             bool hasTb = _hTaskbar != IntPtr.Zero && NativeMethods.GetWindowRect(_hTaskbar, out tbRect);
+
+            // Windows 10/11 Auto-Hide Edge Detection
+            Screen scr = Screen.PrimaryScreen;
+            bool isRetracted = false;
+            if (hasTb)
+            {
+                if (tbRect.Height <= 6 || tbRect.Width <= 6)
+                {
+                    isRetracted = true;
+                }
+                else if (scr != null)
+                {
+                    if (tbRect.Top >= scr.Bounds.Bottom - 4) isRetracted = true;
+                    else if (tbRect.Bottom <= scr.Bounds.Top + 4) isRetracted = true;
+                    else if (tbRect.Right <= scr.Bounds.Left + 4) isRetracted = true;
+                    else if (tbRect.Left >= scr.Bounds.Right - 4) isRetracted = true;
+                }
+            }
+
+            _isTaskbarHidden = isRetracted;
+            if (isRetracted)
+            {
+                return Rectangle.Empty;
+            }
+
             if (hasTb && tbRect.Width > 100 && tbRect.Height > 10)
             {
                 _lastValidTaskbarRect = tbRect;
@@ -102,14 +129,16 @@ namespace MetriX.Services
             }
             else
             {
-                var scr = Screen.PrimaryScreen;
-                tbRect = new NativeMethods.RECT
+                if (scr != null)
                 {
-                    Left = 0,
-                    Top = scr.WorkingArea.Bottom,
-                    Right = scr.Bounds.Width,
-                    Bottom = scr.Bounds.Height
-                };
+                    tbRect = new NativeMethods.RECT
+                    {
+                        Left = 0,
+                        Top = scr.WorkingArea.Bottom,
+                        Right = scr.Bounds.Width,
+                        Bottom = scr.Bounds.Height
+                    };
+                }
                 _lastValidTaskbarRect = tbRect;
             }
 
@@ -202,12 +231,28 @@ namespace MetriX.Services
             }
 
             NativeMethods.RECT curTb;
-            if (NativeMethods.GetWindowRect(_hTaskbar, out curTb) && curTb.Width > 100)
+            if (NativeMethods.GetWindowRect(_hTaskbar, out curTb))
             {
-                if (curTb.Left != _lastValidTaskbarRect.Left || curTb.Top != _lastValidTaskbarRect.Top ||
-                    curTb.Right != _lastValidTaskbarRect.Right || curTb.Bottom != _lastValidTaskbarRect.Bottom)
+                Screen scr = Screen.PrimaryScreen;
+                bool isRetracted = (curTb.Height <= 6 || curTb.Width <= 6) ||
+                    (scr != null && (curTb.Top >= scr.Bounds.Bottom - 4 ||
+                                     curTb.Bottom <= scr.Bounds.Top + 4 ||
+                                     curTb.Right <= scr.Bounds.Left + 4 ||
+                                     curTb.Left >= scr.Bounds.Right - 4));
+
+                if (isRetracted != _isTaskbarHidden)
                 {
+                    _isTaskbarHidden = isRetracted;
                     return true;
+                }
+
+                if (curTb.Width > 100 && !isRetracted)
+                {
+                    if (curTb.Left != _lastValidTaskbarRect.Left || curTb.Top != _lastValidTaskbarRect.Top ||
+                        curTb.Right != _lastValidTaskbarRect.Right || curTb.Bottom != _lastValidTaskbarRect.Bottom)
+                    {
+                        return true;
+                    }
                 }
             }
 

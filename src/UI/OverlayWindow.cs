@@ -224,11 +224,25 @@ namespace MetriX.UI
             if (_secondaryTaskbarHandle != IntPtr.Zero)
             {
                 bounds = _taskbarTracker.CalculateSecondaryBounds(_secondaryTaskbarHandle, width, height);
-                if (bounds.IsEmpty) return;
+                if (bounds.IsEmpty)
+                {
+                    if (Visible) Visible = false;
+                    return;
+                }
             }
             else
             {
                 bounds = _taskbarTracker.CalculateBounds(cfg, width, height);
+                if (bounds.IsEmpty || (_taskbarTracker != null && _taskbarTracker.IsTaskbarHidden))
+                {
+                    if (Visible) Visible = false;
+                    return;
+                }
+            }
+
+            if (!Visible)
+            {
+                Visible = true;
             }
 
             // Draw to in-memory 32-bit ARGB DIB Section
@@ -653,12 +667,21 @@ namespace MetriX.UI
 
             const int WM_DISPLAYCHANGE = 0x007E;
             const int WM_DPICHANGED = 0x02E0;
+            const int WM_SETTINGCHANGE = 0x001A;
+            const int WM_THEMECHANGED = 0x031A;
 
             if (m.Msg == WM_DISPLAYCHANGE || m.Msg == WM_DPICHANGED)
             {
                 _taskbarTracker.RefreshHandles();
                 EnsureTaskbarOwnership();
                 RenderFrame();
+            }
+            else if (m.Msg == WM_SETTINGCHANGE || m.Msg == WM_THEMECHANGED)
+            {
+                if (_configService.Config.AutoTheme)
+                {
+                    RenderFrame();
+                }
             }
 
             base.WndProc(ref m);

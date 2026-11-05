@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
@@ -211,11 +212,12 @@ namespace MetriX.UI
         protected override void OnMouseDown(MouseEventArgs e)
         {
             base.OnMouseDown(e);
-            if (e.X < 30)
+            int btnWidth = Math.Min(28, Width / 4);
+            if (e.X < btnWidth)
             {
                 Value -= _step;
             }
-            else if (e.X > Width - 30)
+            else if (e.X > Width - btnWidth)
             {
                 Value += _step;
             }
@@ -224,8 +226,9 @@ namespace MetriX.UI
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e);
-            bool minus = e.X < 30;
-            bool plus = e.X > Width - 30;
+            int btnWidth = Math.Min(28, Width / 4);
+            bool minus = e.X < btnWidth;
+            bool plus = e.X > Width - btnWidth;
 
             if (minus != _minusHovered || plus != _plusHovered)
             {
@@ -267,18 +270,21 @@ namespace MetriX.UI
                 }
             }
 
+            int btnWidth = Math.Min(28, w / 4);
+
             // Draw minus button area
             if (_minusHovered)
             {
                 using (var hovBrush = new SolidBrush(Color.FromArgb(55, 55, 60)))
                 {
-                    g.FillRectangle(hovBrush, 1, 1, 28, h - 1);
+                    g.FillRectangle(hovBrush, 1, 1, btnWidth, h - 1);
                 }
             }
-            using (var symBrush = new SolidBrush(Color.FromArgb(210, 210, 215)))
+            Rectangle minusRect = new Rectangle(0, 0, btnWidth, h);
             using (var symFont = new Font("Segoe UI", 10.0f, FontStyle.Bold))
             {
-                g.DrawString("−", symFont, symBrush, 9, 3);
+                TextRenderer.DrawText(g, "−", symFont, minusRect, Color.FromArgb(210, 210, 215),
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
             }
 
             // Draw plus button area
@@ -286,26 +292,27 @@ namespace MetriX.UI
             {
                 using (var hovBrush = new SolidBrush(Color.FromArgb(55, 55, 60)))
                 {
-                    g.FillRectangle(hovBrush, w - 28, 1, 27, h - 1);
+                    g.FillRectangle(hovBrush, w - btnWidth, 1, btnWidth, h - 1);
                 }
             }
-            using (var symBrush = new SolidBrush(Color.FromArgb(210, 210, 215)))
+            Rectangle plusRect = new Rectangle(w - btnWidth, 0, btnWidth, h);
             using (var symFont = new Font("Segoe UI", 10.0f, FontStyle.Bold))
             {
-                g.DrawString("+", symFont, symBrush, w - 21, 4);
+                TextRenderer.DrawText(g, "+", symFont, plusRect, Color.FromArgb(210, 210, 215),
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
             }
 
             // Draw dividers
             using (var divPen = new Pen(Color.FromArgb(55, 55, 60), 1))
             {
-                g.DrawLine(divPen, 29, 3, 29, h - 3);
-                g.DrawLine(divPen, w - 29, 3, w - 29, h - 3);
+                g.DrawLine(divPen, btnWidth, 3, btnWidth, h - 3);
+                g.DrawLine(divPen, w - btnWidth, 3, w - btnWidth, h - 3);
             }
 
             // Draw formatted value text
             string format = _decimalPlaces > 0 ? "F" + _decimalPlaces : "F0";
             string text = _value.ToString(format) + _suffix;
-            Rectangle valRect = new Rectangle(30, 0, Math.Max(10, w - 60), h);
+            Rectangle valRect = new Rectangle(btnWidth + 2, 0, Math.Max(10, w - (btnWidth * 2) - 4), h);
             TextRenderer.DrawText(g, text, Font, valRect, ForeColor,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
         }
@@ -348,26 +355,28 @@ namespace MetriX.UI
             set { _lblDesc.Text = value; }
         }
 
-        public FluentSettingCard(string title, string description, Control actionControl, int cardHeight = 62)
+        public FluentSettingCard(string title, string description, Control actionControl, int cardHeight = 66)
         {
-            Size = new Size(535, cardHeight);
+            Size = new Size(540, cardHeight);
             BackColor = Color.FromArgb(32, 32, 36);
 
             if (actionControl != null)
             {
-                actionControl.Location = new Point(Width - actionControl.Width - 14, (cardHeight - actionControl.Height) / 2);
+                actionControl.Location = new Point(Width - actionControl.Width - 16, (cardHeight - actionControl.Height) / 2);
+                actionControl.Anchor = AnchorStyles.Top | AnchorStyles.Right;
                 Controls.Add(actionControl);
+                actionControl.BringToFront();
             }
 
-            int maxTextWidth = (actionControl != null) ? (actionControl.Left - 24) : (Width - 28);
-            if (maxTextWidth < 140) maxTextWidth = 140;
+            int maxTextWidth = (actionControl != null) ? (actionControl.Left - 28) : (Width - 32);
+            if (maxTextWidth < 180) maxTextWidth = 180;
 
             _lblTitle = new Label
             {
                 Text = title,
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
                 ForeColor = Color.White,
-                Location = new Point(14, 11),
+                Location = new Point(16, 12),
                 AutoSize = true,
                 UseMnemonic = false,
                 MaximumSize = new Size(maxTextWidth, 0)
@@ -376,9 +385,9 @@ namespace MetriX.UI
             _lblDesc = new Label
             {
                 Text = description,
-                Font = new Font("Segoe UI", 7.5f, FontStyle.Regular),
+                Font = new Font("Segoe UI", 8.0f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(160, 160, 165),
-                Location = new Point(14, 31),
+                Location = new Point(16, 33),
                 AutoSize = true,
                 UseMnemonic = false,
                 MaximumSize = new Size(maxTextWidth, 0)
@@ -398,6 +407,180 @@ namespace MetriX.UI
                     e.Graphics.DrawPath(pen, path);
                 }
             };
+        }
+
+        private static GraphicsPath GetRoundedRect(int x, int y, int width, int height, int radius)
+        {
+            GraphicsPath path = new GraphicsPath();
+            int diameter = radius * 2;
+            Rectangle arc = new Rectangle(x, y, diameter, diameter);
+
+            path.AddArc(arc, 180, 90);
+            arc.X = x + width - diameter;
+            path.AddArc(arc, 270, 90);
+            arc.Y = y + height - diameter;
+            path.AddArc(arc, 0, 90);
+            arc.X = x;
+            path.AddArc(arc, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
+    }
+
+    /// <summary>
+    /// Modern Windows 11 Fluent Dropdown Control with acrylic menu popup.
+    /// Eliminates legacy Win98/Win32 ComboBox white borders and text clipping.
+    /// </summary>
+    public class FluentDropdown : Control
+    {
+        private readonly List<string> _items = new List<string>();
+        private int _selectedIndex = -1;
+        private bool _isHovered;
+
+        public event EventHandler SelectedIndexChanged;
+
+        public IList<string> Items { get { return _items; } }
+
+        public int SelectedIndex
+        {
+            get { return _selectedIndex; }
+            set
+            {
+                int clamped = Math.Max(-1, Math.Min(_items.Count - 1, value));
+                if (_selectedIndex != clamped)
+                {
+                    _selectedIndex = clamped;
+                    Invalidate();
+                    if (SelectedIndexChanged != null) SelectedIndexChanged(this, EventArgs.Empty);
+                }
+            }
+        }
+
+        public string SelectedItem
+        {
+            get { return (_selectedIndex >= 0 && _selectedIndex < _items.Count) ? _items[_selectedIndex] : null; }
+            set
+            {
+                int idx = _items.IndexOf(value);
+                if (idx >= 0) SelectedIndex = idx;
+            }
+        }
+
+        public int FindStringExact(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return -1;
+            for (int i = 0; i < _items.Count; i++)
+            {
+                if (string.Equals(_items[i], s, StringComparison.OrdinalIgnoreCase))
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        public FluentDropdown()
+        {
+            SetStyle(ControlStyles.AllPaintingInWmPaint |
+                     ControlStyles.UserPaint |
+                     ControlStyles.OptimizedDoubleBuffer |
+                     ControlStyles.ResizeRedraw, true);
+
+            Size = new Size(240, 30);
+            BackColor = Color.FromArgb(36, 36, 40);
+            ForeColor = Color.White;
+            Font = new Font("Segoe UI", 9.0f, FontStyle.Regular);
+            Cursor = Cursors.Hand;
+        }
+
+        protected override void OnMouseEnter(EventArgs e)
+        {
+            base.OnMouseEnter(e);
+            _isHovered = true;
+            Invalidate();
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            _isHovered = false;
+            Invalidate();
+        }
+
+        protected override void OnClick(EventArgs e)
+        {
+            base.OnClick(e);
+            ShowDropdownMenu();
+        }
+
+        private void ShowDropdownMenu()
+        {
+            if (_items.Count == 0) return;
+
+            var menu = new ContextMenuStrip();
+            menu.Renderer = new Windows11MenuRenderer();
+            menu.ShowImageMargin = false;
+
+            for (int i = 0; i < _items.Count; i++)
+            {
+                int index = i;
+                string text = _items[i];
+                var item = new ToolStripMenuItem(text);
+                item.Font = Font;
+                if (index == _selectedIndex)
+                {
+                    item.Font = new Font(Font, FontStyle.Bold);
+                    item.Checked = true;
+                }
+                item.Click += (s, ev) =>
+                {
+                    SelectedIndex = index;
+                };
+                menu.Items.Add(item);
+            }
+
+            Point pt = new Point(0, Height + 2);
+            menu.Show(this, pt);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
+
+            int w = Width - 1;
+            int h = Height - 1;
+
+            Color bg = _isHovered ? Color.FromArgb(48, 48, 54) : BackColor;
+            Color border = _isHovered ? Color.FromArgb(80, 80, 88) : Color.FromArgb(55, 55, 62);
+
+            using (var path = GetRoundedRect(0, 0, w, h, 4))
+            {
+                using (var brush = new SolidBrush(bg))
+                {
+                    g.FillPath(brush, path);
+                }
+                using (var pen = new Pen(border, 1.2f))
+                {
+                    g.DrawPath(pen, path);
+                }
+            }
+
+            // Draw selected text
+            string text = (_selectedIndex >= 0 && _selectedIndex < _items.Count) ? _items[_selectedIndex] : "";
+            Rectangle textRect = new Rectangle(10, 0, Math.Max(10, w - 32), h);
+            TextRenderer.DrawText(g, text, Font, textRect, ForeColor,
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+
+            // Draw drop chevron (v)
+            int cx = w - 14;
+            int cy = h / 2;
+            using (var pen = new Pen(Color.FromArgb(200, 200, 205), 1.3f))
+            {
+                g.DrawLine(pen, cx - 4, cy - 2, cx, cy + 2);
+                g.DrawLine(pen, cx, cy + 2, cx + 4, cy - 2);
+            }
         }
 
         private static GraphicsPath GetRoundedRect(int x, int y, int width, int height, int radius)
