@@ -79,14 +79,43 @@ namespace MetriX.UI
             Graphics g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
 
+            Rectangle pillRect = new Rectangle(4, 2, e.Item.Width - 8, e.Item.Height - 4);
+
             if (e.Item.Selected && e.Item.Enabled)
             {
                 // Draw sleek rounded selection pill
-                Rectangle pillRect = new Rectangle(4, 2, e.Item.Width - 8, e.Item.Height - 4);
                 using (var path = GetRoundedRect(pillRect.X, pillRect.Y, pillRect.Width, pillRect.Height, 4))
                 using (var brush = new SolidBrush(HoverPillColor))
                 {
                     g.FillPath(brush, path);
+                }
+            }
+
+            // Custom Item Outlines
+            string tag = e.Item.Tag as string;
+            if (!string.IsNullOrEmpty(tag))
+            {
+                Color outlineCol = Color.Empty;
+                if (tag == "Exit")
+                {
+                    outlineCol = Color.FromArgb(232, 17, 35); // Sleek red
+                }
+                else if (tag == "Docked")
+                {
+                    outlineCol = Color.FromArgb(0, 150, 255); // Taskbar blue/cyan
+                }
+                else if (tag == "Detached")
+                {
+                    outlineCol = Color.FromArgb(108, 203, 95); // Floating green
+                }
+
+                if (outlineCol != Color.Empty)
+                {
+                    using (var path = GetRoundedRect(pillRect.X, pillRect.Y, pillRect.Width, pillRect.Height, 4))
+                    using (var pen = new Pen(outlineCol, 1.25f))
+                    {
+                        g.DrawPath(pen, path);
+                    }
                 }
             }
         }

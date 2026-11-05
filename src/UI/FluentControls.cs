@@ -504,7 +504,8 @@ namespace MetriX.UI
         public FluentScrollBar()
         {
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint |
-                     ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+                     ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw |
+                     ControlStyles.SupportsTransparentBackColor, true);
             Width = 10;
             BackColor = Color.Transparent;
             Cursor = Cursors.Default;

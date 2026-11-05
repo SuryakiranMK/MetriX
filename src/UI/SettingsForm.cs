@@ -825,7 +825,7 @@ namespace MetriX.UI
             };
             btnCheckUpdates.FlatAppearance.BorderSize = 0;
 
-            var cardUpdates = new FluentSettingCard("Application Updates", "metriX v3.2.1 • Up to date", btnCheckUpdates);
+            var cardUpdates = new FluentSettingCard("Application Updates", "metriX v3.2.2 • Up to date", btnCheckUpdates);
             btnCheckUpdates.Click += (s, e) =>
             {
                 if (_updateService == null) return;
