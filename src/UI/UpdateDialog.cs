@@ -51,7 +51,7 @@ namespace MetriX.UI
         private void InitializeUI()
         {
             Text = "metriX Update Available";
-            Size = new Size(460, 440);
+            Size = new Size(480, 470);
             StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
@@ -65,7 +65,7 @@ namespace MetriX.UI
             var headerPanel = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 72,
+                Height = 74,
                 BackColor = Color.FromArgb(34, 34, 38)
             };
             headerPanel.Paint += (s, e) =>
@@ -81,7 +81,7 @@ namespace MetriX.UI
                 Text = "⚡",
                 Font = new Font("Segoe UI", 18.0f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(76, 194, 255),
-                Location = new Point(16, 16),
+                Location = new Point(16, 14),
                 AutoSize = true
             };
 
@@ -90,7 +90,7 @@ namespace MetriX.UI
                 Text = string.Format("metriX {0} is available!", _updateInfo.VersionTag),
                 Font = new Font("Segoe UI", 12.0f, FontStyle.Bold),
                 ForeColor = Color.White,
-                Location = new Point(54, 14),
+                Location = new Point(62, 14),
                 AutoSize = true,
                 UseMnemonic = false
             };
@@ -104,7 +104,7 @@ namespace MetriX.UI
                 Text = string.Format("Current version: v{0} • Released {1}", _updateInfo.CurrentVersion, dateStr),
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(170, 170, 175),
-                Location = new Point(55, 38),
+                Location = new Point(62, 40),
                 AutoSize = true,
                 UseMnemonic = false
             };
@@ -114,11 +114,13 @@ namespace MetriX.UI
             headerPanel.Controls.Add(lblSubtitle);
             Controls.Add(headerPanel);
 
+            int contentW = 432;
+
             // Changelog / Release Highlights Card
             var cardChangelog = new Panel
             {
                 Location = new Point(16, 86),
-                Size = new Size(412, 190),
+                Size = new Size(contentW, 185),
                 BackColor = Color.FromArgb(20, 20, 22)
             };
             cardChangelog.Paint += (s, e) =>
@@ -149,9 +151,11 @@ namespace MetriX.UI
                 BorderStyle = BorderStyle.None,
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
                 Location = new Point(12, 28),
-                Size = new Size(388, 150),
+                Size = new Size(contentW - 24, 145),
                 Text = CleanChangelogText(_updateInfo.Changelog)
             };
+            txtChangelog.GotFocus += (s, e) => { txtChangelog.Select(0, 0); };
+            txtChangelog.MouseDown += (s, e) => { txtChangelog.Select(0, 0); };
 
             cardChangelog.Controls.Add(lblCardHeader);
             cardChangelog.Controls.Add(txtChangelog);
@@ -160,14 +164,14 @@ namespace MetriX.UI
             // Silent Update Opt-In Option
             var pnlOption = new Panel
             {
-                Location = new Point(16, 284),
-                Size = new Size(412, 34),
+                Location = new Point(16, 280),
+                Size = new Size(contentW, 32),
                 BackColor = Color.Transparent
             };
 
             _toggleSilent = new FluentToggleSwitch
             {
-                Location = new Point(0, 5),
+                Location = new Point(0, 4),
                 Checked = _configService.Config.EnableSilentAutoUpdate
             };
             _toggleSilent.CheckedChanged += (s, e) =>
@@ -181,7 +185,7 @@ namespace MetriX.UI
                 Text = "Automatically download and install future updates silently",
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(200, 200, 205),
-                Location = new Point(48, 8),
+                Location = new Point(48, 6),
                 AutoSize = true,
                 Cursor = Cursors.Hand
             };
@@ -194,8 +198,8 @@ namespace MetriX.UI
             // Progress bar panel (hidden initially)
             _progressPanel = new Panel
             {
-                Location = new Point(16, 322),
-                Size = new Size(412, 26),
+                Location = new Point(16, 318),
+                Size = new Size(contentW, 38),
                 BackColor = Color.Transparent,
                 Visible = false
             };
@@ -203,17 +207,17 @@ namespace MetriX.UI
             _lblProgressStatus = new Label
             {
                 Text = "Downloading update...",
-                Font = new Font("Segoe UI", 8.0f, FontStyle.Regular),
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(76, 194, 255),
                 Location = new Point(0, 0),
-                Size = new Size(412, 16),
+                Size = new Size(contentW, 18),
                 TextAlign = ContentAlignment.MiddleLeft
             };
 
             var pnlBarTrack = new Panel
             {
-                Location = new Point(0, 18),
-                Size = new Size(412, 6),
+                Location = new Point(0, 22),
+                Size = new Size(contentW, 8),
                 BackColor = Color.FromArgb(40, 40, 45)
             };
             pnlBarTrack.Paint += (s, e) =>
@@ -241,7 +245,7 @@ namespace MetriX.UI
             var footerPanel = new Panel
             {
                 Dock = DockStyle.Bottom,
-                Height = 54,
+                Height = 56,
                 BackColor = Color.FromArgb(24, 24, 28)
             };
             footerPanel.Paint += (s, e) =>
@@ -252,21 +256,6 @@ namespace MetriX.UI
                 }
             };
 
-            _btnLater = new Button
-            {
-                Text = "Remind Later",
-                Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
-                ForeColor = Color.FromArgb(200, 200, 205),
-                BackColor = Color.FromArgb(38, 38, 42),
-                FlatStyle = FlatStyle.Flat,
-                Size = new Size(115, 34),
-                Location = new Point(195, 10),
-                Cursor = Cursors.Hand,
-                UseMnemonic = false
-            };
-            _btnLater.FlatAppearance.BorderColor = Color.FromArgb(55, 55, 60);
-            _btnLater.Click += (s, e) => Close();
-
             _btnUpdate = new Button
             {
                 Text = "⚡ Download & Install",
@@ -274,13 +263,32 @@ namespace MetriX.UI
                 ForeColor = Color.White,
                 BackColor = Color.FromArgb(0, 120, 215),
                 FlatStyle = FlatStyle.Flat,
-                Size = new Size(140, 34),
-                Location = new Point(318, 10),
+                Size = new Size(170, 34),
+                Location = new Point(278, 11),
                 Cursor = Cursors.Hand,
-                UseMnemonic = false
+                UseMnemonic = false,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Padding = Padding.Empty
             };
             _btnUpdate.FlatAppearance.BorderSize = 0;
             _btnUpdate.Click += OnStartUpdateClick;
+
+            _btnLater = new Button
+            {
+                Text = "Remind Later",
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
+                ForeColor = Color.FromArgb(200, 200, 205),
+                BackColor = Color.FromArgb(38, 38, 42),
+                FlatStyle = FlatStyle.Flat,
+                Size = new Size(110, 34),
+                Location = new Point(158, 11),
+                Cursor = Cursors.Hand,
+                UseMnemonic = false,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Padding = Padding.Empty
+            };
+            _btnLater.FlatAppearance.BorderColor = Color.FromArgb(55, 55, 60);
+            _btnLater.Click += (s, e) => Close();
 
             footerPanel.Controls.Add(_btnLater);
             footerPanel.Controls.Add(_btnUpdate);
@@ -332,6 +340,7 @@ namespace MetriX.UI
                     {
                         restartTimer.Stop();
                         restartTimer.Dispose();
+                        Hide();
                         UpdateService.ApplyUpdateAndRestart(readyExePath);
                     };
                     restartTimer.Start();

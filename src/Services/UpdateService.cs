@@ -377,24 +377,30 @@ namespace MetriX.Services
         {
             try
             {
+                int currentPid = Process.GetCurrentProcess().Id;
                 string currentExePath = Process.GetCurrentProcess().MainModule.FileName;
+                string parentDir = Path.GetDirectoryName(currentExePath);
                 string scriptPath = Path.Combine(Path.GetTempPath(), "metriX_swap.cmd");
 
                 // Micro-transition script: waits for current process to terminate, replaces binary, and relaunches
                 string cmd = string.Format(
                     "@echo off\r\n" +
                     "chcp 65001 >nul\r\n" +
+                    ":: Wait briefly for current process to release\r\n" +
                     "timeout /t 1 /nobreak >nul\r\n" +
+                    ":: Ensure PID is terminated\r\n" +
+                    "taskkill /f /pid {0} >nul 2>&1\r\n" +
                     ":retry\r\n" +
-                    "copy /y \"{0}\" \"{1}\" >nul\r\n" +
+                    "copy /y \"{1}\" \"{2}\" >nul 2>&1\r\n" +
                     "if errorlevel 1 (\r\n" +
                     "    timeout /t 1 /nobreak >nul\r\n" +
                     "    goto retry\r\n" +
                     ")\r\n" +
-                    "del /f /q \"{0}\" >nul 2>&1\r\n" +
-                    "start \"\" \"{1}\"\r\n" +
+                    "cd /d \"{3}\"\r\n" +
+                    "start \"\" \"{2}\"\r\n" +
+                    "del /f /q \"{1}\" >nul 2>&1\r\n" +
                     "del /f /q \"%~f0\" >nul 2>&1\r\n",
-                    newExePath, currentExePath);
+                    currentPid, newExePath, currentExePath, parentDir);
 
                 File.WriteAllText(scriptPath, cmd, Encoding.UTF8);
 
@@ -408,10 +414,11 @@ namespace MetriX.Services
                 };
 
                 Process.Start(psi);
-                Application.Exit();
+                Environment.Exit(0);
             }
             catch
             {
+                Environment.Exit(0);
             }
         }
 
