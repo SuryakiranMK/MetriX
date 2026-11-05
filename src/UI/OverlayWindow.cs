@@ -25,6 +25,8 @@ namespace MetriX.UI
         private Point _initialWindowLocation;
         private int _initialOffsetX;
         private ContextMenuStrip _contextMenu;
+        private NativeMethods.HookProc _mouseHookProc;
+        private IntPtr _hMouseHook = IntPtr.Zero;
 
         public event Action RequestOpenSettings;
         public event Action RequestToggleFlyout;
@@ -159,8 +161,6 @@ namespace MetriX.UI
             var itemApps = new ToolStripMenuItem("Center (Right of Open Apps)", null, (s, e) => SetPosition(PositionMode.RightOfApps));
             itemPosition.DropDownItems.AddRange(new ToolStripItem[] { itemTray, itemLeft, itemApps });
 
-            var itemTaskMgr = new ToolStripMenuItem("📊  Open Task Manager", null, (s, e) => LaunchTaskManager());
-
             var itemStartup = new ToolStripMenuItem("🚀  Start with Windows", null, (s, e) =>
             {
                 _configService.Config.StartWithWindows = !_configService.Config.StartWithWindows;
@@ -185,6 +185,9 @@ namespace MetriX.UI
                 itemFloating.Text = cfg.IsFloatingMode ? "📌  Dock back to Taskbar" : "📌  Detach to Floating Widget";
             };
 
+            _contextMenu.Opened += OnContextMenuOpened;
+            _contextMenu.Closed += OnContextMenuClosed;
+
             _contextMenu.Items.Add(itemFlyout);
             _contextMenu.Items.Add(itemSettings);
             _contextMenu.Items.Add(itemUpdates);
@@ -192,10 +195,99 @@ namespace MetriX.UI
             _contextMenu.Items.Add(itemFloating);
             _contextMenu.Items.Add(itemLayout);
             _contextMenu.Items.Add(itemPosition);
-            _contextMenu.Items.Add(itemTaskMgr);
             _contextMenu.Items.Add(itemStartup);
             _contextMenu.Items.Add(new ToolStripSeparator());
             _contextMenu.Items.Add(itemExit);
+        }
+
+        private void OnContextMenuOpened(object sender, EventArgs e)
+        {
+            StartOutsideClickWatcher();
+        }
+
+        private void OnContextMenuClosed(object sender, ToolStripDropDownClosedEventArgs e)
+        {
+            StopOutsideClickWatcher();
+        }
+
+        private void StartOutsideClickWatcher()
+        {
+            if (_hMouseHook != IntPtr.Zero) return;
+            try
+            {
+                _mouseHookProc = MouseHookCallback;
+                using (Process curProcess = Process.GetCurrentProcess())
+                using (ProcessModule curModule = curProcess.MainModule)
+                {
+                    _hMouseHook = NativeMethods.SetWindowsHookEx(NativeMethods.WH_MOUSE_LL, _mouseHookProc, NativeMethods.GetModuleHandle(curModule.ModuleName), 0);
+                }
+            }
+            catch { }
+        }
+
+        private void StopOutsideClickWatcher()
+        {
+            if (_hMouseHook != IntPtr.Zero)
+            {
+                try
+                {
+                    NativeMethods.UnhookWindowsHookEx(_hMouseHook);
+                }
+                catch { }
+                _hMouseHook = IntPtr.Zero;
+            }
+        }
+
+        private IntPtr MouseHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
+        {
+            if (nCode >= 0)
+            {
+                int msg = wParam.ToInt32();
+                if (msg == NativeMethods.WM_LBUTTONDOWN || msg == NativeMethods.WM_RBUTTONDOWN ||
+                    msg == NativeMethods.WM_NCLBUTTONDOWN || msg == NativeMethods.WM_NCRBUTTONDOWN)
+                {
+                    Point pt = Cursor.Position;
+                    if (_contextMenu != null && _contextMenu.Visible && !_contextMenu.Bounds.Contains(pt))
+                    {
+                        // Check if cursor is inside any open dropdown submenu as well
+                        bool insideChild = false;
+                        foreach (ToolStripItem item in _contextMenu.Items)
+                        {
+                            ToolStripDropDownItem dropDownItem = item as ToolStripDropDownItem;
+                            if (dropDownItem != null && dropDownItem.DropDown.Visible && dropDownItem.DropDown.Bounds.Contains(pt))
+                            {
+                                insideChild = true;
+                                break;
+                            }
+                        }
+
+                        if (!insideChild)
+                        {
+                            try
+                            {
+                                BeginInvoke(new Action(() =>
+                                {
+                                    if (_contextMenu != null && _contextMenu.Visible)
+                                    {
+                                        _contextMenu.Close();
+                                    }
+                                }));
+                            }
+                            catch { }
+                        }
+                    }
+                }
+            }
+            return NativeMethods.CallNextHookEx(_hMouseHook, nCode, wParam, lParam);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                StopOutsideClickWatcher();
+            }
+            base.Dispose(disposing);
         }
 
         private void ToggleLayout(LayoutMode mode)
@@ -649,6 +741,7 @@ namespace MetriX.UI
 
             if (e.Button == MouseButtons.Right)
             {
+                NativeMethods.SetForegroundWindow(Handle);
                 _contextMenu.Show(Cursor.Position);
             }
             else if (e.Button == MouseButtons.Left)

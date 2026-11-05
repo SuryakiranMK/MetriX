@@ -11,6 +11,19 @@ using MetriX.Services;
 
 namespace MetriX.UI
 {
+    internal class DoubleBufferedPanel : Panel
+    {
+        public DoubleBufferedPanel()
+        {
+            DoubleBuffered = true;
+            SetStyle(ControlStyles.AllPaintingInWmPaint |
+                     ControlStyles.UserPaint |
+                     ControlStyles.OptimizedDoubleBuffer |
+                     ControlStyles.ResizeRedraw, true);
+            UpdateStyles();
+        }
+    }
+
     public class FlyoutWindow : Form
     {
         private readonly ConfigService _configService;
@@ -28,7 +41,7 @@ namespace MetriX.UI
         private Panel _panelSpeedTest;
 
         // Live Monitor Controls
-        private Panel _graphPanel;
+        private DoubleBufferedPanel _graphPanel;
         private Label _lblDownloadStats;
         private Label _lblUploadStats;
         private Label _lblAdapterInfo;
@@ -36,7 +49,8 @@ namespace MetriX.UI
         private Label _lblQuotaStats;
         private Panel _quotaProgressBar;
         private float _quotaPercent = 0f;
-        private Label _lblTopApps;
+        private DoubleBufferedPanel _pnlTopApps;
+        private List<AppNetworkUsage> _currentTopApps = new List<AppNetworkUsage>();
         private Button _btn30s;
         private Button _btn60s;
         private Button _btn5m;
@@ -56,7 +70,7 @@ namespace MetriX.UI
         private bool _isHoveringGraph = false;
 
         // Speed Test Controls
-        private Panel _gaugePanel;
+        private DoubleBufferedPanel _gaugePanel;
         private Button _btnStartSpeedTest;
         private Label _lblSpeedTestStatus;
         private Label _lblTestPing;
@@ -394,8 +408,8 @@ namespace MetriX.UI
             container.Controls.Add(_lblDownloadStats);
             container.Controls.Add(_lblUploadStats);
 
-            // Interactive Graph Canvas
-            _graphPanel = new Panel
+            // Interactive Graph Canvas (DoubleBuffered to eliminate hover flicker)
+            _graphPanel = new DoubleBufferedPanel
             {
                 Location = new Point(14, 34),
                 Size = new Size(w, 134),
@@ -405,10 +419,13 @@ namespace MetriX.UI
             _graphPanel.Paint += OnGraphPaint;
             _graphPanel.MouseMove += (s, e) =>
             {
-                _hoverMouseX = e.X;
-                _hoverMouseY = e.Y;
-                _isHoveringGraph = true;
-                _graphPanel.Invalidate();
+                if (_hoverMouseX != e.X || _hoverMouseY != e.Y)
+                {
+                    _hoverMouseX = e.X;
+                    _hoverMouseY = e.Y;
+                    _isHoveringGraph = true;
+                    _graphPanel.Invalidate();
+                }
             };
             _graphPanel.MouseLeave += (s, e) =>
             {
@@ -620,22 +637,21 @@ namespace MetriX.UI
                 }
             };
 
-            _lblTopApps = new Label
+            _pnlTopApps = new DoubleBufferedPanel
             {
-                Text = "Top Active Apps:\nDetecting...",
-                Font = new Font("Segoe UI", 7.5f, FontStyle.Regular),
-                ForeColor = Color.FromArgb(170, 210, 255),
                 Location = new Point(10, 94),
-                Size = new Size(w - 20, 76),
-                UseMnemonic = false
+                Size = new Size(w - 20, 78),
+                BackColor = Color.Transparent,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
+            _pnlTopApps.Paint += OnTopAppsPaint;
 
             cardSession.Controls.Add(lblCardTitle);
             cardSession.Controls.Add(_lblAdapterInfo);
             cardSession.Controls.Add(_lblSessionTotals);
             cardSession.Controls.Add(_lblQuotaStats);
             cardSession.Controls.Add(_quotaProgressBar);
-            cardSession.Controls.Add(_lblTopApps);
+            cardSession.Controls.Add(_pnlTopApps);
             container.Controls.Add(cardSession);
         }
 
@@ -643,8 +659,8 @@ namespace MetriX.UI
         {
             int w = container.Width - 28;
 
-            // Speedometer Gauge Arc Canvas
-            _gaugePanel = new Panel
+            // Speedometer Gauge Arc Canvas (DoubleBuffered to eliminate flicker)
+            _gaugePanel = new DoubleBufferedPanel
             {
                 Location = new Point(14, 6),
                 Size = new Size(w, 142),
@@ -1181,29 +1197,131 @@ namespace MetriX.UI
             try
             {
                 var topApps = _processTracker.GetTopActiveApps(4);
-                if (topApps != null && topApps.Count > 0)
-                {
-                    var parts = new List<string>();
-                    foreach (var app in topApps)
-                    {
-                        parts.Add(string.Format("{0} ({1})", app.ProcessName, app.ActiveConnections));
-                    }
-                    _lblTopApps.Text = "Top Network Apps:\n" + string.Join(" • ", parts.ToArray());
-                }
-                else
-                {
-                    _lblTopApps.Text = "Top Network Apps:\nNone active";
-                }
+                _currentTopApps = topApps ?? new List<AppNetworkUsage>();
             }
             catch
             {
-                _lblTopApps.Text = "Top Network Apps: N/A";
+                _currentTopApps = new List<AppNetworkUsage>();
             }
+            if (_pnlTopApps != null) _pnlTopApps.Invalidate();
 
             if (_panelMonitor.Visible)
             {
                 _graphPanel.Invalidate();
             }
+        }
+
+        private void OnTopAppsPaint(object sender, PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
+
+            int w = _pnlTopApps.ClientSize.Width;
+            int h = _pnlTopApps.ClientSize.Height;
+
+            // Header line: "TOP NETWORK APPS"
+            using (var titleFont = new Font("Segoe UI", 7.0f, FontStyle.Bold))
+            using (var titleBrush = new SolidBrush(Color.FromArgb(150, 150, 155)))
+            using (var dotBrush = new SolidBrush(Color.FromArgb(76, 194, 255)))
+            {
+                g.FillEllipse(dotBrush, 0, 3, 5, 5);
+                g.DrawString("TOP NETWORK APPS", titleFont, titleBrush, 9, 0);
+            }
+
+            if (_currentTopApps == null || _currentTopApps.Count == 0)
+            {
+                using (var emptyFont = new Font("Segoe UI", 7.5f, FontStyle.Regular))
+                using (var emptyBrush = new SolidBrush(Color.FromArgb(140, 140, 145)))
+                {
+                    g.DrawString("No active network sockets detected", emptyFont, emptyBrush, 0, 24);
+                }
+                return;
+            }
+
+            // Draw up to 4 app pills in a 2x2 grid
+            int count = Math.Min(4, _currentTopApps.Count);
+            int maxConns = 1;
+            foreach (var app in _currentTopApps)
+            {
+                if (app.ActiveConnections > maxConns) maxConns = app.ActiveConnections;
+            }
+
+            int gap = 6;
+            int colW = (w - gap) / 2;
+            int pillH = 26;
+
+            using (var nameFont = new Font("Segoe UI", 8.0f, FontStyle.Bold))
+            using (var badgeFont = new Font("Segoe UI", 7.0f, FontStyle.Bold))
+            using (var iconFont = new Font("Segoe UI Emoji", 8.0f, FontStyle.Regular))
+            using (var pillBg = new SolidBrush(Color.FromArgb(40, 40, 46)))
+            using (var pillBorder = new Pen(Color.FromArgb(58, 58, 66), 1))
+            using (var nameBrush = new SolidBrush(Color.FromArgb(235, 235, 240)))
+            using (var badgeBg = new SolidBrush(Color.FromArgb(24, 60, 95)))
+            using (var badgeText = new SolidBrush(Color.FromArgb(76, 194, 255)))
+            using (var barBrush = new SolidBrush(Color.FromArgb(0, 120, 215)))
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    var app = _currentTopApps[i];
+                    int col = i % 2;
+                    int row = i / 2;
+                    int px = col * (colW + gap);
+                    int py = 16 + (row * (pillH + 4));
+
+                    Rectangle pillRect = new Rectangle(px, py, colW, pillH);
+                    using (var path = GetRoundedRect(pillRect.X, pillRect.Y, pillRect.Width - 1, pillRect.Height - 1, 4))
+                    {
+                        g.FillPath(pillBg, path);
+                        g.DrawPath(pillBorder, path);
+                    }
+
+                    // Mini activity bar at bottom of pill
+                    int barW = Math.Max(4, (int)((colW - 8) * (app.ActiveConnections / (float)maxConns)));
+                    g.FillRectangle(barBrush, px + 4, py + pillH - 2, barW, 2);
+
+                    // App icon glyph
+                    string icon = GetAppCategoryIcon(app.ProcessName);
+                    g.DrawString(icon, iconFont, nameBrush, px + 5, py + 4);
+
+                    // Badge (e.g. "12") on right
+                    string badge = app.ActiveConnections.ToString();
+                    SizeF badgeSz = g.MeasureString(badge, badgeFont);
+                    int bw = (int)Math.Ceiling(badgeSz.Width) + 8;
+                    int bx = px + colW - bw - 4;
+                    int by = py + 4;
+                    using (var bPath = GetRoundedRect(bx, by, bw, 16, 3))
+                    {
+                        g.FillPath(badgeBg, bPath);
+                    }
+                    g.DrawString(badge, badgeFont, badgeText, bx + 4, by + 1);
+
+                    // Process Name
+                    int maxNameW = bx - (px + 24) - 2;
+                    string displayName = app.ProcessName;
+                    SizeF nameSz = g.MeasureString(displayName, nameFont);
+                    if (nameSz.Width > maxNameW && displayName.Length > 8)
+                    {
+                        displayName = displayName.Substring(0, Math.Min(displayName.Length, 7)) + "…";
+                    }
+                    g.DrawString(displayName, nameFont, nameBrush, px + 23, py + 4);
+                }
+            }
+        }
+
+        private static string GetAppCategoryIcon(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return "📡";
+            string lower = name.ToLowerInvariant();
+            if (lower.Contains("chrome") || lower.Contains("edge") || lower.Contains("firefox") || lower.Contains("zen") || lower.Contains("brave") || lower.Contains("opera"))
+                return "🌐";
+            if (lower.Contains("steam") || lower.Contains("epic") || lower.Contains("discord") || lower.Contains("riot") || lower.Contains("game"))
+                return "🎮";
+            if (lower.Contains("code") || lower.Contains("git") || lower.Contains("agy") || lower.Contains("antigravity") || lower.Contains("devenv") || lower.Contains("cmd") || lower.Contains("node"))
+                return "⚡";
+            if (lower.Contains("explorer") || lower.Contains("svchost") || lower.Contains("system"))
+                return "⚙";
+            return "📡";
         }
 
         private static string FormatLinkSpeed(ulong bps)

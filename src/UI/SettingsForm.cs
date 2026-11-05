@@ -237,13 +237,13 @@ namespace MetriX.UI
             _navRail.Controls.Add(lblBrand);
             _navRail.Controls.Add(lblSubBrand);
 
-            // Nav category items with native Segoe vector glyphs
+            // Nav category items with clean, concise names that never clip
             NavItemDef[] navItems = new NavItemDef[]
             {
-                new NavItemDef("\uE707", "Position & Layout"),
-                new NavItemDef("\uE790", "Typography & Colors"),
-                new NavItemDef("\uE947", "Spacing & Geometry"),
-                new NavItemDef("\uE713", "System & Network")
+                new NavItemDef("\uE707", "Position"),
+                new NavItemDef("\uE790", "Typography"),
+                new NavItemDef("\uE947", "Spacing"),
+                new NavItemDef("\uE713", "System")
             };
 
             int btnY = 75;
@@ -786,7 +786,7 @@ namespace MetriX.UI
             };
             btnCheckUpdates.FlatAppearance.BorderSize = 0;
 
-            var cardUpdates = new FluentSettingCard("Application Updates", "metriX v2.8.0 • Up to date", btnCheckUpdates) { Location = new Point(0, y) };
+            var cardUpdates = new FluentSettingCard("Application Updates", "metriX v2.9.0 • Up to date", btnCheckUpdates) { Location = new Point(0, y) };
             btnCheckUpdates.Click += (s, e) =>
             {
                 if (_updateService == null) return;
