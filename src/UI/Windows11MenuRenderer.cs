@@ -76,6 +76,8 @@ namespace MetriX.UI
 
         protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
         {
+            if (e.Item is QuickActionBarItem) return;
+
             Graphics g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
 
@@ -122,6 +124,8 @@ namespace MetriX.UI
 
         protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
         {
+            if (e.Item is QuickActionBarItem) return;
+
             Graphics g = e.Graphics;
             g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
 

@@ -30,11 +30,7 @@ namespace MetriX.UI
         private Rectangle _lastRenderedBounds = Rectangle.Empty;
 
         // Context Menu Controls & Items
-        private Button _btnMenuFlyout;
-        private Button _btnMenuSettings;
-        private Button _btnMenuUpdates;
-        private Panel _pnlQuickActions;
-        private ToolStripControlHost _hostQuickActions;
+        private QuickActionBarItem _quickActionBar;
         private ToolStripMenuItem _itemFloating;
         private ToolStripMenuItem _itemFloatingSize;
         private ToolStripMenuItem _itemFloatingSnap;
@@ -162,65 +158,26 @@ namespace MetriX.UI
             catch { }
         }
 
-        private static Button CreateQuickActionButton(string text, int x, int width, Action onClick)
-        {
-            var btn = new Button
-            {
-                Text = text,
-                Font = new Font("Segoe UI", 8.25f, FontStyle.Regular),
-                ForeColor = Color.FromArgb(220, 220, 225),
-                BackColor = Color.FromArgb(40, 40, 46),
-                FlatStyle = FlatStyle.Flat,
-                Size = new Size(width, 28),
-                Location = new Point(x, 4),
-                Cursor = Cursors.Hand,
-                UseMnemonic = false,
-                TextAlign = ContentAlignment.MiddleCenter,
-                Padding = Padding.Empty
-            };
-            btn.FlatAppearance.BorderSize = 1;
-            btn.FlatAppearance.BorderColor = Color.FromArgb(56, 56, 62);
-            btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(52, 52, 60);
-            btn.Click += (s, e) => onClick();
-            return btn;
-        }
-
         private void BuildContextMenu()
         {
             _contextMenu = new ContextMenuStrip();
             _contextMenu.Renderer = new Windows11MenuRenderer();
 
-            // Top Row: 3-column quick action bar (Flyout, Settings, Updates)
-            _pnlQuickActions = new Panel
+            // Top Row: Native ToolStripMenuItem 3-column quick action bar (Flyout, Settings, Updates)
+            _quickActionBar = new QuickActionBarItem
             {
-                Size = new Size(224, 36),
-                BackColor = Color.FromArgb(32, 32, 35)
-            };
-
-            _btnMenuFlyout = CreateQuickActionButton("📊 Flyout", 4, 68, () =>
-            {
-                _contextMenu.Close();
-                if (RequestToggleFlyout != null) RequestToggleFlyout();
-            });
-            _btnMenuSettings = CreateQuickActionButton("⚙ Settings", 76, 68, () =>
-            {
-                _contextMenu.Close();
-                if (RequestOpenSettings != null) RequestOpenSettings();
-            });
-            _btnMenuUpdates = CreateQuickActionButton("🔄 Updates", 148, 68, () =>
-            {
-                _contextMenu.Close();
-                if (RequestCheckUpdates != null) RequestCheckUpdates();
-            });
-
-            _pnlQuickActions.Controls.Add(_btnMenuFlyout);
-            _pnlQuickActions.Controls.Add(_btnMenuSettings);
-            _pnlQuickActions.Controls.Add(_btnMenuUpdates);
-
-            _hostQuickActions = new ToolStripControlHost(_pnlQuickActions)
-            {
-                Margin = new Padding(0, 2, 0, 2),
-                Padding = Padding.Empty
+                OnFlyoutClick = () =>
+                {
+                    if (RequestToggleFlyout != null) RequestToggleFlyout();
+                },
+                OnSettingsClick = () =>
+                {
+                    if (RequestOpenSettings != null) RequestOpenSettings();
+                },
+                OnUpdatesClick = () =>
+                {
+                    if (RequestCheckUpdates != null) RequestCheckUpdates();
+                }
             };
 
             // Dock / Detach item (Blue outline when docked, Green outline when detached)
@@ -295,7 +252,7 @@ namespace MetriX.UI
             _contextMenu.Opened += OnContextMenuOpened;
             _contextMenu.Closed += OnContextMenuClosed;
 
-            _contextMenu.Items.Add(_hostQuickActions);
+            _contextMenu.Items.Add(_quickActionBar);
             _contextMenu.Items.Add(new ToolStripSeparator());
             _contextMenu.Items.Add(_itemFloating);
             _contextMenu.Items.Add(_itemFloatingSize);
@@ -338,37 +295,6 @@ namespace MetriX.UI
                 _itemSizeLarge.Checked = Math.Abs(cfg.FloatingScale - 1.25) < 0.05;
                 _itemSizeXLarge.Checked = Math.Abs(cfg.FloatingScale - 1.5) < 0.05;
             }
-
-            // Measure widest visible menu item to eliminate right empty space on quick action bar
-            int maxItemW = 216;
-            foreach (ToolStripItem it in _contextMenu.Items)
-            {
-                if (it != _hostQuickActions && it.Visible)
-                {
-                    Size pref = it.GetPreferredSize(Size.Empty);
-                    if (pref.Width > maxItemW) maxItemW = pref.Width;
-                }
-            }
-
-            // Sync quick actions panel width and symmetrically space buttons
-            int panelW = maxItemW;
-            _pnlQuickActions.Width = panelW;
-            _hostQuickActions.Size = new Size(panelW, 36);
-
-            int margin = 4;
-            int gap = 4;
-            int usableW = panelW - (margin * 2) - (gap * 2);
-            int btnW = usableW / 3;
-
-            _btnMenuFlyout.Location = new Point(margin, 4);
-            _btnMenuFlyout.Size = new Size(btnW, 28);
-
-            _btnMenuSettings.Location = new Point(margin + btnW + gap, 4);
-            _btnMenuSettings.Size = new Size(btnW, 28);
-
-            int btnUpdatesX = margin + (btnW + gap) * 2;
-            _btnMenuUpdates.Location = new Point(btnUpdatesX, 4);
-            _btnMenuUpdates.Size = new Size(panelW - margin - btnUpdatesX, 28);
         }
 
         private void SetFloatingScale(double scale)
@@ -412,29 +338,6 @@ namespace MetriX.UI
         private void OnContextMenuOpened(object sender, EventArgs e)
         {
             StartOutsideClickWatcher();
-            if (_pnlQuickActions != null && _contextMenu != null && _contextMenu.ClientSize.Width > 0)
-            {
-                int clientW = _contextMenu.ClientSize.Width;
-                if (_pnlQuickActions.Width != clientW)
-                {
-                    _pnlQuickActions.Width = clientW;
-                    _hostQuickActions.Size = new Size(clientW, 36);
-                    int margin = 4;
-                    int gap = 4;
-                    int usableW = clientW - (margin * 2) - (gap * 2);
-                    int btnW = usableW / 3;
-
-                    _btnMenuFlyout.Location = new Point(margin, 4);
-                    _btnMenuFlyout.Size = new Size(btnW, 28);
-
-                    _btnMenuSettings.Location = new Point(margin + btnW + gap, 4);
-                    _btnMenuSettings.Size = new Size(btnW, 28);
-
-                    int btnUpdatesX = margin + (btnW + gap) * 2;
-                    _btnMenuUpdates.Location = new Point(btnUpdatesX, 4);
-                    _btnMenuUpdates.Size = new Size(clientW - margin - btnUpdatesX, 28);
-                }
-            }
         }
 
         private void OnContextMenuClosed(object sender, ToolStripDropDownClosedEventArgs e)
