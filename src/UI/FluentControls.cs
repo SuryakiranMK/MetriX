@@ -342,6 +342,7 @@ namespace MetriX.UI
     {
         private readonly Label _lblTitle;
         private readonly Label _lblDesc;
+        private readonly Control _actionControl;
 
         public string CardTitle
         {
@@ -352,23 +353,29 @@ namespace MetriX.UI
         public string CardDescription
         {
             get { return _lblDesc.Text; }
-            set { _lblDesc.Text = value; }
+            set
+            {
+                _lblDesc.Text = value;
+                AdjustCardHeight();
+            }
         }
 
-        public FluentSettingCard(string title, string description, Control actionControl, int cardHeight = 66)
+        public FluentSettingCard(string title, string description, Control actionControl, int cardHeight = 68)
         {
+            _actionControl = actionControl;
             Size = new Size(550, cardHeight);
             BackColor = Color.FromArgb(32, 32, 36);
 
+            int rightPadding = 16;
             if (actionControl != null)
             {
-                actionControl.Location = new Point(Width - actionControl.Width - 16, (cardHeight - actionControl.Height) / 2);
+                actionControl.Location = new Point(Width - actionControl.Width - rightPadding, (cardHeight - actionControl.Height) / 2);
                 actionControl.Anchor = AnchorStyles.Top | AnchorStyles.Right;
                 Controls.Add(actionControl);
                 actionControl.BringToFront();
             }
 
-            int maxTextWidth = (actionControl != null) ? (actionControl.Left - 20) : (Width - 32);
+            int maxTextWidth = (actionControl != null) ? (actionControl.Left - 22) : (Width - 32);
             if (maxTextWidth < 180) maxTextWidth = 180;
 
             _lblTitle = new Label
@@ -385,7 +392,7 @@ namespace MetriX.UI
             _lblDesc = new Label
             {
                 Text = description,
-                Font = new Font("Segoe UI", 8.0f, FontStyle.Regular),
+                Font = new Font("Segoe UI", 8.25f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(160, 160, 165),
                 Location = new Point(16, 33),
                 AutoSize = true,
@@ -395,6 +402,8 @@ namespace MetriX.UI
 
             Controls.Add(_lblTitle);
             Controls.Add(_lblDesc);
+
+            AdjustCardHeight();
 
             Paint += (s, e) =>
             {
@@ -407,6 +416,19 @@ namespace MetriX.UI
                     e.Graphics.DrawPath(pen, path);
                 }
             };
+        }
+
+        private void AdjustCardHeight()
+        {
+            int neededHeight = Math.Max(68, _lblDesc.Bottom + 12);
+            if (neededHeight > Height)
+            {
+                Height = neededHeight;
+                if (_actionControl != null)
+                {
+                    _actionControl.Location = new Point(_actionControl.Left, (Height - _actionControl.Height) / 2);
+                }
+            }
         }
 
         private static GraphicsPath GetRoundedRect(int x, int y, int width, int height, int radius)
@@ -424,6 +446,280 @@ namespace MetriX.UI
             path.AddArc(arc, 90, 90);
             path.CloseFigure();
             return path;
+        }
+    }
+
+    /// <summary>
+    /// Modern Windows 11 Sleek Dark Scrollbar.
+    /// Replaces ugly white Win32 scrollbars with an aesthetic 6px dark pill.
+    /// </summary>
+    public class FluentScrollBar : Control
+    {
+        private int _minimum = 0;
+        private int _maximum = 100;
+        private int _value = 0;
+        private int _viewportSize = 20;
+
+        private bool _isHovered = false;
+        private bool _isDragging = false;
+        private int _dragStartY;
+        private int _dragStartValue;
+
+        public event EventHandler ValueChanged;
+
+        public int Minimum
+        {
+            get { return _minimum; }
+            set { _minimum = value; Invalidate(); }
+        }
+
+        public int Maximum
+        {
+            get { return _maximum; }
+            set { _maximum = Math.Max(_minimum, value); Invalidate(); }
+        }
+
+        public int ViewportSize
+        {
+            get { return _viewportSize; }
+            set { _viewportSize = Math.Max(1, value); Invalidate(); }
+        }
+
+        public int Value
+        {
+            get { return _value; }
+            set
+            {
+                int maxScroll = Math.Max(0, _maximum - _viewportSize);
+                int clamped = Math.Max(_minimum, Math.Min(maxScroll, value));
+                if (_value != clamped)
+                {
+                    _value = clamped;
+                    Invalidate();
+                    if (ValueChanged != null) ValueChanged(this, EventArgs.Empty);
+                }
+            }
+        }
+
+        public FluentScrollBar()
+        {
+            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint |
+                     ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+            Width = 10;
+            BackColor = Color.Transparent;
+            Cursor = Cursors.Default;
+        }
+
+        private Rectangle GetThumbRect()
+        {
+            int trackH = Height;
+            if (trackH <= 0) return Rectangle.Empty;
+
+            int maxScroll = Math.Max(1, _maximum - _viewportSize);
+            float ratio = (float)_viewportSize / Math.Max(1, _maximum);
+            int thumbH = Math.Max(32, Math.Min(trackH, (int)(trackH * ratio)));
+            int scrollableTrack = trackH - thumbH;
+
+            float scrollPercent = (float)(_value - _minimum) / maxScroll;
+            int thumbY = (int)(scrollableTrack * scrollPercent);
+
+            int thumbW = _isHovered || _isDragging ? 6 : 4;
+            int thumbX = Width - thumbW - 2;
+
+            return new Rectangle(thumbX, thumbY, thumbW, thumbH);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+
+            int maxScroll = _maximum - _viewportSize;
+            if (maxScroll <= 0) return;
+
+            Rectangle thumbRect = GetThumbRect();
+            if (thumbRect.IsEmpty) return;
+
+            Color thumbColor = _isDragging ? Color.FromArgb(145, 145, 152) :
+                               _isHovered ? Color.FromArgb(115, 115, 122) :
+                               Color.FromArgb(70, 70, 76);
+
+            using (Brush thumbBrush = new SolidBrush(thumbColor))
+            using (GraphicsPath path = CreatePill(thumbRect))
+            {
+                g.FillPath(thumbBrush, path);
+            }
+        }
+
+        private static GraphicsPath CreatePill(Rectangle r)
+        {
+            var path = new GraphicsPath();
+            int rad = Math.Min(r.Width, r.Height) / 2;
+            if (rad <= 0) rad = 1;
+            path.AddArc(r.X, r.Y, r.Width, r.Width, 180, 180);
+            path.AddArc(r.X, r.Bottom - r.Width, r.Width, r.Width, 0, 180);
+            path.CloseFigure();
+            return path;
+        }
+
+        protected override void OnMouseEnter(EventArgs e)
+        {
+            base.OnMouseEnter(e);
+            _isHovered = true;
+            Invalidate();
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            _isHovered = false;
+            Invalidate();
+        }
+
+        protected override void OnMouseDown(MouseEventArgs e)
+        {
+            base.OnMouseDown(e);
+            if (e.Button == MouseButtons.Left)
+            {
+                Rectangle thumb = GetThumbRect();
+                if (thumb.Contains(e.Location))
+                {
+                    _isDragging = true;
+                    _dragStartY = e.Y;
+                    _dragStartValue = _value;
+                    Capture = true;
+                }
+                else
+                {
+                    int maxScroll = Math.Max(1, _maximum - _viewportSize);
+                    int trackH = Height - thumb.Height;
+                    if (trackH > 0)
+                    {
+                        float pct = (float)(e.Y - thumb.Height / 2) / trackH;
+                        Value = (int)(pct * maxScroll);
+                    }
+                }
+            }
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            base.OnMouseMove(e);
+            if (_isDragging)
+            {
+                int deltaY = e.Y - _dragStartY;
+                Rectangle thumb = GetThumbRect();
+                int trackH = Height - thumb.Height;
+                if (trackH > 0)
+                {
+                    int maxScroll = Math.Max(1, _maximum - _viewportSize);
+                    int deltaVal = (int)((float)deltaY / trackH * maxScroll);
+                    Value = _dragStartValue + deltaVal;
+                }
+            }
+        }
+
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            base.OnMouseUp(e);
+            if (_isDragging)
+            {
+                _isDragging = false;
+                Capture = false;
+                Invalidate();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Dark Fluent Scrollable Page container for SettingsForm.
+    /// Completely replaces white Win32 scrollbars with sleek dark navigation.
+    /// </summary>
+    public class FluentScrollablePage : Panel
+    {
+        private readonly Panel _contentPanel;
+        private readonly FluentScrollBar _scrollBar;
+
+        public Panel ContentPanel { get { return _contentPanel; } }
+        public FluentScrollBar ScrollBar { get { return _scrollBar; } }
+
+        public FluentScrollablePage(int y, int height)
+        {
+            Location = new Point(0, y);
+            Size = new Size(585, height);
+            AutoScroll = false;
+            BackColor = Color.Transparent;
+            Visible = false;
+
+            _contentPanel = new Panel
+            {
+                Location = new Point(0, 0),
+                Size = new Size(568, height),
+                AutoScroll = false,
+                BackColor = Color.Transparent
+            };
+
+            _scrollBar = new FluentScrollBar
+            {
+                Location = new Point(573, 4),
+                Size = new Size(10, height - 8),
+                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Right,
+                ViewportSize = height,
+                Visible = false
+            };
+            _scrollBar.ValueChanged += (s, e) =>
+            {
+                _contentPanel.Top = -_scrollBar.Value;
+            };
+
+            Controls.Add(_contentPanel);
+            Controls.Add(_scrollBar);
+        }
+
+        public void AddCard(FluentSettingCard card)
+        {
+            _contentPanel.Controls.Add(card);
+            card.MouseEnter += (s, e) => { if (!Focused) Focus(); };
+            card.MouseWheel += OnForwardMouseWheel;
+            foreach (Control child in card.Controls)
+            {
+                child.MouseEnter += (s, e) => { if (!Focused) Focus(); };
+                child.MouseWheel += OnForwardMouseWheel;
+            }
+
+            UpdateScrollRange();
+        }
+
+        public void UpdateScrollRange()
+        {
+            int maxBottom = 0;
+            foreach (Control c in _contentPanel.Controls)
+            {
+                if (c.Bottom > maxBottom) maxBottom = c.Bottom;
+            }
+            int totalH = maxBottom + 20;
+            _contentPanel.Height = Math.Max(Height, totalH);
+            _scrollBar.Maximum = totalH;
+            _scrollBar.ViewportSize = Height;
+            _scrollBar.Visible = totalH > Height;
+        }
+
+        public void ScrollByDelta(int delta)
+        {
+            if (!_scrollBar.Visible) return;
+            int step = (delta / 120) * 44;
+            _scrollBar.Value -= step;
+        }
+
+        private void OnForwardMouseWheel(object sender, MouseEventArgs e)
+        {
+            ScrollByDelta(e.Delta);
+        }
+
+        protected override void OnMouseWheel(MouseEventArgs e)
+        {
+            base.OnMouseWheel(e);
+            ScrollByDelta(e.Delta);
         }
     }
 

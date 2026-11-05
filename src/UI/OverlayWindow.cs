@@ -171,14 +171,11 @@ namespace MetriX.UI
                 RenderFrame();
             });
 
-            // Floating Customization Submenus
-            var itemFloatingSize = new ToolStripMenuItem("📐  Widget Size");
-            itemFloatingSize.DropDown.Renderer = new Windows11MenuRenderer();
-            var itemSizeCompact = new ToolStripMenuItem("Compact (80%)", null, (s, e) => SetFloatingScale(0.8));
-            var itemSizeNormal = new ToolStripMenuItem("Standard (100%)", null, (s, e) => SetFloatingScale(1.0));
-            var itemSizeLarge = new ToolStripMenuItem("Large (125%)", null, (s, e) => SetFloatingScale(1.25));
-            var itemSizeXLarge = new ToolStripMenuItem("Extra Large (150%)", null, (s, e) => SetFloatingScale(1.5));
-            itemFloatingSize.DropDownItems.AddRange(new ToolStripItem[] { itemSizeCompact, itemSizeNormal, itemSizeLarge, itemSizeXLarge });
+            // Floating Customization Submenus & Controls
+            var sepFloatingTop = new ToolStripSeparator();
+            var itemFloatingHeader = new ToolStripMenuItem("⚡  FLOATING WIDGET CONTROLS") { Enabled = false };
+            itemFloatingHeader.Font = new Font("Segoe UI", 7.5f, FontStyle.Bold);
+            itemFloatingHeader.ForeColor = Color.FromArgb(76, 194, 255);
 
             var itemFloatingLock = new ToolStripMenuItem("🔒  Lock Position", null, (s, e) =>
             {
@@ -187,6 +184,14 @@ namespace MetriX.UI
                 _configService.Save(cfg);
             });
 
+            var itemFloatingSize = new ToolStripMenuItem("📐  Widget Size");
+            itemFloatingSize.DropDown.Renderer = new Windows11MenuRenderer();
+            var itemSizeCompact = new ToolStripMenuItem("Compact (80%)", null, (s, e) => SetFloatingScale(0.8));
+            var itemSizeNormal = new ToolStripMenuItem("Standard (100%)", null, (s, e) => SetFloatingScale(1.0));
+            var itemSizeLarge = new ToolStripMenuItem("Large (125%)", null, (s, e) => SetFloatingScale(1.25));
+            var itemSizeXLarge = new ToolStripMenuItem("Extra Large (150%)", null, (s, e) => SetFloatingScale(1.5));
+            itemFloatingSize.DropDownItems.AddRange(new ToolStripItem[] { itemSizeCompact, itemSizeNormal, itemSizeLarge, itemSizeXLarge });
+
             var itemFloatingSnap = new ToolStripMenuItem("📍  Snap to Corner");
             itemFloatingSnap.DropDown.Renderer = new Windows11MenuRenderer();
             var itemSnapBR = new ToolStripMenuItem("Bottom-Right", null, (s, e) => SnapFloatingToCorner(2));
@@ -194,6 +199,17 @@ namespace MetriX.UI
             var itemSnapBL = new ToolStripMenuItem("Bottom-Left", null, (s, e) => SnapFloatingToCorner(4));
             var itemSnapTL = new ToolStripMenuItem("Top-Left", null, (s, e) => SnapFloatingToCorner(3));
             itemFloatingSnap.DropDownItems.AddRange(new ToolStripItem[] { itemSnapBR, itemSnapTR, itemSnapBL, itemSnapTL });
+
+            var itemFloatingTop = new ToolStripMenuItem("🔝  Always on Top", null, (s, e) =>
+            {
+                var cfg = _configService.Config;
+                cfg.FloatingAlwaysOnTop = !cfg.FloatingAlwaysOnTop;
+                _configService.Save(cfg);
+                EnsureTaskbarOwnership();
+                RenderFrame();
+            });
+
+            var sepFloatingBottom = new ToolStripSeparator();
 
             var itemLayout = new ToolStripMenuItem("🔄  Display Layout");
             itemLayout.DropDown.Renderer = new Windows11MenuRenderer();
@@ -245,17 +261,23 @@ namespace MetriX.UI
                 itemTray.Checked = (cfg.Position == PositionMode.LeftOfTray);
                 itemLeft.Checked = (cfg.Position == PositionMode.FarLeft);
                 itemApps.Checked = (cfg.Position == PositionMode.RightOfApps);
-                itemPosition.Enabled = !cfg.IsFloatingMode;
+                itemPosition.Visible = !cfg.IsFloatingMode;
                 itemStartup.Checked = cfg.StartWithWindows;
                 itemFloating.Text = cfg.IsFloatingMode ? "📌  Dock back to Taskbar" : "📌  Detach to Floating Widget";
 
-                itemFloatingSize.Visible = cfg.IsFloatingMode;
+                sepFloatingTop.Visible = cfg.IsFloatingMode;
+                itemFloatingHeader.Visible = cfg.IsFloatingMode;
                 itemFloatingLock.Visible = cfg.IsFloatingMode;
+                itemFloatingSize.Visible = cfg.IsFloatingMode;
                 itemFloatingSnap.Visible = cfg.IsFloatingMode;
+                itemFloatingTop.Visible = cfg.IsFloatingMode;
+                sepFloatingBottom.Visible = cfg.IsFloatingMode;
 
                 if (cfg.IsFloatingMode)
                 {
-                    itemFloatingLock.Text = cfg.FloatingLocked ? "🔓  Unlock Position" : "🔒  Lock Position";
+                    itemFloatingLock.Checked = cfg.FloatingLocked;
+                    itemFloatingLock.Text = cfg.FloatingLocked ? "🔒  Lock Position (Locked)" : "🔒  Lock Position";
+                    itemFloatingTop.Checked = cfg.FloatingAlwaysOnTop;
                     itemSizeCompact.Checked = Math.Abs(cfg.FloatingScale - 0.8) < 0.05;
                     itemSizeNormal.Checked = Math.Abs(cfg.FloatingScale - 1.0) < 0.05;
                     itemSizeLarge.Checked = Math.Abs(cfg.FloatingScale - 1.25) < 0.05;
@@ -271,9 +293,13 @@ namespace MetriX.UI
             _contextMenu.Items.Add(itemUpdates);
             _contextMenu.Items.Add(new ToolStripSeparator());
             _contextMenu.Items.Add(itemFloating);
-            _contextMenu.Items.Add(itemFloatingSize);
+            _contextMenu.Items.Add(sepFloatingTop);
+            _contextMenu.Items.Add(itemFloatingHeader);
             _contextMenu.Items.Add(itemFloatingLock);
+            _contextMenu.Items.Add(itemFloatingSize);
             _contextMenu.Items.Add(itemFloatingSnap);
+            _contextMenu.Items.Add(itemFloatingTop);
+            _contextMenu.Items.Add(sepFloatingBottom);
             _contextMenu.Items.Add(itemLayout);
             _contextMenu.Items.Add(itemPosition);
             _contextMenu.Items.Add(itemStartup);
@@ -959,31 +985,7 @@ namespace MetriX.UI
             if (e.Button == MouseButtons.Right)
             {
                 NativeMethods.SetForegroundWindow(Handle);
-                var cfg = _configService.Config;
-                if (cfg.IsFloatingMode)
-                {
-                    Screen scr = Screen.FromPoint(Location);
-                    Rectangle wa = scr.WorkingArea;
-                    int menuW = Math.Max(220, _contextMenu.PreferredSize.Width);
-                    int menuH = Math.Max(260, _contextMenu.PreferredSize.Height);
-
-                    int posX = Location.X;
-                    if (posX + menuW > wa.Right) posX = wa.Right - menuW;
-                    if (posX < wa.Left) posX = wa.Left;
-
-                    int posY = Location.Y + Height + 4;
-                    if (posY + menuH > wa.Bottom)
-                    {
-                        posY = Location.Y - menuH - 4;
-                        if (posY < wa.Top) posY = wa.Bottom - menuH;
-                    }
-
-                    _contextMenu.Show(new Point(posX, posY));
-                }
-                else
-                {
-                    _contextMenu.Show(Cursor.Position);
-                }
+                _contextMenu.Show(Cursor.Position);
             }
             else if (e.Button == MouseButtons.Left)
             {
