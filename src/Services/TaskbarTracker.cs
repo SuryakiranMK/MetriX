@@ -178,13 +178,14 @@ namespace MetriX.Services
 
                 case PositionMode.LeftOfTray:
                 default:
+                    int weatherOffset = DetectWeatherWidgetWidth(_hTaskbar, trayRect);
                     if (hasTray && trayRect.Left > 0)
                     {
-                        targetX = trayRect.Left - widgetWidth - 4 + (config != null ? config.OffsetX : 0);
+                        targetX = trayRect.Left - weatherOffset - widgetWidth - 4 + (config != null ? config.OffsetX : 0);
                     }
                     else if (_lastValidTrayRect.Left > 0)
                     {
-                        targetX = _lastValidTrayRect.Left - widgetWidth - 4 + (config != null ? config.OffsetX : 0);
+                        targetX = _lastValidTrayRect.Left - weatherOffset - widgetWidth - 4 + (config != null ? config.OffsetX : 0);
                     }
                     else
                     {
@@ -204,6 +205,34 @@ namespace MetriX.Services
 
             _lastValidCalculatedBounds = new Rectangle(targetX, targetY, widgetWidth, widgetHeight);
             return _lastValidCalculatedBounds;
+        }
+
+        private int DetectWeatherWidgetWidth(IntPtr hTaskbar, NativeMethods.RECT trayRect)
+        {
+            if (hTaskbar == IntPtr.Zero || trayRect.Left <= 0) return 0;
+            try
+            {
+                int detectedWidth = 0;
+                IntPtr hChild = IntPtr.Zero;
+                while ((hChild = NativeMethods.FindWindowEx(hTaskbar, hChild, null, null)) != IntPtr.Zero)
+                {
+                    if (hChild == _hTrayNotify) continue;
+                    NativeMethods.RECT r;
+                    if (NativeMethods.GetWindowRect(hChild, out r))
+                    {
+                        // Check if child sits inside taskbar and immediately to the left of the tray (within 16px)
+                        if (r.Width > 24 && r.Height > 10 && Math.Abs(r.Right - trayRect.Left) <= 16)
+                        {
+                            if (r.Width > detectedWidth) detectedWidth = r.Width;
+                        }
+                    }
+                }
+                return detectedWidth;
+            }
+            catch
+            {
+                return 0;
+            }
         }
 
         public bool HasPositionChanged()

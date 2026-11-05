@@ -182,9 +182,26 @@ namespace MetriX.UI
             var itemPosition = new ToolStripMenuItem("📍  Taskbar Position");
             itemPosition.DropDown.Renderer = new Windows11MenuRenderer();
             var itemTray = new ToolStripMenuItem("Right (Left of System Tray)", null, (s, e) => SetPosition(PositionMode.LeftOfTray));
+            var itemWeather = new ToolStripMenuItem("Left of Weather Widget", null, (s, e) =>
+            {
+                var cfg = _configService.Config;
+                cfg.Position = PositionMode.LeftOfTray;
+                cfg.OffsetX = -130;
+                cfg.OffsetY = 0;
+                _configService.Save(cfg);
+                RenderFrame();
+            });
             var itemLeft = new ToolStripMenuItem("Left (Near Start / Widgets)", null, (s, e) => SetPosition(PositionMode.FarLeft));
             var itemApps = new ToolStripMenuItem("Center (Right of Open Apps)", null, (s, e) => SetPosition(PositionMode.RightOfApps));
-            itemPosition.DropDownItems.AddRange(new ToolStripItem[] { itemTray, itemLeft, itemApps });
+            var itemResetOffset = new ToolStripMenuItem("Reset Position Offset (0 px)", null, (s, e) =>
+            {
+                var cfg = _configService.Config;
+                cfg.OffsetX = 0;
+                cfg.OffsetY = 0;
+                _configService.Save(cfg);
+                RenderFrame();
+            });
+            itemPosition.DropDownItems.AddRange(new ToolStripItem[] { itemTray, itemWeather, itemLeft, itemApps, new ToolStripSeparator(), itemResetOffset });
 
             var itemStartup = new ToolStripMenuItem("🚀  Start with Windows", null, (s, e) =>
             {
@@ -873,7 +890,7 @@ namespace MetriX.UI
                         _initialWindowLocation = new Point(cfg.FloatingX, cfg.FloatingY);
                     }
                 }
-                else if ((Control.ModifierKeys & Keys.Control) == Keys.Control)
+                else
                 {
                     _isDragging = true;
                     _dragStartPoint = Cursor.Position;

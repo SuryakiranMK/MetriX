@@ -175,8 +175,8 @@ namespace MetriX.UI
             // Segmented View Switcher Pill
             var pnlSegment = new Panel
             {
-                Size = new Size(196, 28),
-                Location = new Point((Width - 196) / 2, 9),
+                Size = new Size(164, 30),
+                Location = new Point((Width - 164) / 2, 8),
                 BackColor = Color.FromArgb(22, 22, 26)
             };
             pnlSegment.Paint += (s, e) =>
@@ -191,9 +191,9 @@ namespace MetriX.UI
 
             _tabBtnMonitor = new Button
             {
-                Text = "📈 Live",
-                Font = new Font("Segoe UI", 8.0f, FontStyle.Bold),
-                Size = new Size(94, 22),
+                Text = "Live",
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
+                Size = new Size(78, 24),
                 Location = new Point(3, 3),
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand,
@@ -208,10 +208,10 @@ namespace MetriX.UI
 
             _tabBtnSpeedTest = new Button
             {
-                Text = "⚡ Speed",
-                Font = new Font("Segoe UI", 8.0f, FontStyle.Bold),
-                Size = new Size(94, 22),
-                Location = new Point(99, 3),
+                Text = "Speed",
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
+                Size = new Size(78, 24),
+                Location = new Point(83, 3),
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand,
                 UseMnemonic = false,
@@ -229,18 +229,18 @@ namespace MetriX.UI
             var btnClose = new Button
             {
                 Text = "✕",
-                Font = new Font("Segoe UI", 11.0f, FontStyle.Regular),
+                Font = new Font("Segoe UI", 10.0f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(180, 180, 185),
                 BackColor = Color.Transparent,
                 FlatStyle = FlatStyle.Flat,
-                Size = new Size(34, 30),
-                Location = new Point(Width - 44, 8),
+                Size = new Size(46, 46),
+                Location = new Point(Width - 46, 0),
                 Cursor = Cursors.Hand,
                 UseMnemonic = false
             };
             btnClose.FlatAppearance.BorderSize = 0;
-            btnClose.FlatAppearance.MouseOverBackColor = Color.FromArgb(232, 17, 35);
-            btnClose.FlatAppearance.MouseDownBackColor = Color.FromArgb(200, 15, 30);
+            btnClose.FlatAppearance.MouseOverBackColor = Color.FromArgb(196, 43, 28);
+            btnClose.FlatAppearance.MouseDownBackColor = Color.FromArgb(180, 35, 20);
             btnClose.MouseEnter += (s, e) => { btnClose.ForeColor = Color.White; };
             btnClose.MouseLeave += (s, e) => { btnClose.ForeColor = Color.FromArgb(180, 180, 185); };
             btnClose.Click += (s, e) => Hide();
@@ -1299,11 +1299,6 @@ namespace MetriX.UI
                     string icon = GetAppCategoryIcon(app.ProcessName);
                     g.DrawString(icon, iconFont, nameBrush, 6, py + 2);
 
-                    // Socket count badge (e.g. "10 conn")
-                    string badge = string.Format("{0} conn", app.ActiveConnections);
-                    SizeF badgeSz = g.MeasureString(badge, badgeFont);
-                    int bw = (int)Math.Ceiling(badgeSz.Width) + 8;
-
                     // Real-time Bandwidth Consumption (right-aligned)
                     double appSpeed = totalBandwidth * connRatio;
                     string rateText;
@@ -1322,9 +1317,9 @@ namespace MetriX.UI
                     float rx = w - rateSz.Width - 8;
                     g.DrawString(rateText, rateFont, currentRateBrush, rx, py + 3);
 
-                    // App Name (between icon and socket badge)
+                    // App Name (between icon and consumption stats)
                     float nameX = 26;
-                    int maxNameW = (int)(rx - bw - 18 - nameX);
+                    int maxNameW = (int)(rx - 12 - nameX);
                     string displayName = app.ProcessName;
                     SizeF nameSz = g.MeasureString(displayName, nameFont);
                     if (maxNameW > 20 && nameSz.Width > maxNameW)
@@ -1338,15 +1333,14 @@ namespace MetriX.UI
                     }
                     g.DrawString(displayName, nameFont, nameBrush, nameX, py + 2);
 
-                    // Draw socket badge pill right after name
-                    int bx = (int)(nameX + nameSz.Width + 6);
-                    if (bx + bw < rx - 4)
+                    // Subtle, clean socket count text (e.g. "(10)") right beside name without any clunky box
+                    float connX = nameX + nameSz.Width + 4;
+                    if (connX + 28 < rx)
                     {
-                        using (var bPath = GetRoundedRect(bx, py + 2, bw, 15, 3))
+                        using (var mutedBrush = new SolidBrush(Color.FromArgb(135, 135, 142)))
                         {
-                            g.FillPath(badgeBg, bPath);
+                            g.DrawString("(" + app.ActiveConnections + ")", badgeFont, mutedBrush, connX, py + 3);
                         }
-                        g.DrawString(badge, badgeFont, badgeText, bx + 4, py + 2);
                     }
                 }
             }
