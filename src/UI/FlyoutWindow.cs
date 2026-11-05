@@ -53,6 +53,7 @@ namespace MetriX.UI
         private Panel _monitorContentPanel;
         private FluentScrollBar _monitorScrollBar;
         private DoubleBufferedPanel _pnlTopApps;
+        private int _computedTopAppsRowH = 24;
         private List<AppNetworkUsage> _currentTopApps = new List<AppNetworkUsage>();
         private Button _btn30s;
         private Button _btn60s;
@@ -463,7 +464,7 @@ namespace MetriX.UI
             _graphPanel = new DoubleBufferedPanel
             {
                 Location = new Point(14, 34),
-                Size = new Size(w, 134),
+                Size = new Size(w, 150),
                 BackColor = Color.FromArgb(20, 20, 22),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
@@ -488,11 +489,11 @@ namespace MetriX.UI
             _monitorContentPanel.Controls.Add(_graphPanel);
 
             // Card 1: Data Used Till Now (Today / This Week / This Month)
-            int usageY = 174;
+            int usageY = 192;
             var cardUsage = new Panel
             {
                 Location = new Point(14, usageY),
-                Size = new Size(w, 76),
+                Size = new Size(w, 84),
                 BackColor = Color.FromArgb(34, 34, 38),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
@@ -526,19 +527,19 @@ namespace MetriX.UI
             _lblUsageTodayVal = new Label
             {
                 Text = "0 B",
-                Font = new Font("Segoe UI", 10.5f, FontStyle.Bold),
+                Font = new Font("Segoe UI", 12.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(76, 194, 255),
                 Location = new Point(10, 22),
-                Size = new Size(colWidth - 16, 22),
+                Size = new Size(colWidth - 16, 26),
                 TextAlign = ContentAlignment.MiddleLeft,
                 UseMnemonic = false
             };
             _lblUsageTodaySub = new Label
             {
                 Text = "📅 Today",
-                Font = new Font("Segoe UI", 7.5f, FontStyle.Regular),
+                Font = new Font("Segoe UI", 8.0f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(170, 170, 175),
-                Location = new Point(10, 46),
+                Location = new Point(10, 50),
                 Size = new Size(colWidth - 16, 18),
                 TextAlign = ContentAlignment.MiddleLeft,
                 UseMnemonic = false
@@ -548,19 +549,19 @@ namespace MetriX.UI
             _lblUsageWeekVal = new Label
             {
                 Text = "0 B",
-                Font = new Font("Segoe UI", 10.5f, FontStyle.Bold),
+                Font = new Font("Segoe UI", 12.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(108, 203, 95),
                 Location = new Point(colWidth + 8, 22),
-                Size = new Size(colWidth - 16, 22),
+                Size = new Size(colWidth - 16, 26),
                 TextAlign = ContentAlignment.MiddleLeft,
                 UseMnemonic = false
             };
             _lblUsageWeekSub = new Label
             {
                 Text = "📆 This Week",
-                Font = new Font("Segoe UI", 7.5f, FontStyle.Regular),
+                Font = new Font("Segoe UI", 8.0f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(170, 170, 175),
-                Location = new Point(colWidth + 8, 46),
+                Location = new Point(colWidth + 8, 50),
                 Size = new Size(colWidth - 16, 18),
                 TextAlign = ContentAlignment.MiddleLeft,
                 UseMnemonic = false
@@ -570,19 +571,19 @@ namespace MetriX.UI
             _lblUsageMonthVal = new Label
             {
                 Text = "0 B",
-                Font = new Font("Segoe UI", 10.5f, FontStyle.Bold),
+                Font = new Font("Segoe UI", 12.0f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(255, 180, 60),
                 Location = new Point((colWidth * 2) + 8, 22),
-                Size = new Size(colWidth - 16, 22),
+                Size = new Size(colWidth - 16, 26),
                 TextAlign = ContentAlignment.MiddleLeft,
                 UseMnemonic = false
             };
             _lblUsageMonthSub = new Label
             {
                 Text = "🗓️ This Month",
-                Font = new Font("Segoe UI", 7.5f, FontStyle.Regular),
+                Font = new Font("Segoe UI", 8.0f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(170, 170, 175),
-                Location = new Point((colWidth * 2) + 8, 46),
+                Location = new Point((colWidth * 2) + 8, 50),
                 Size = new Size(colWidth - 16, 18),
                 TextAlign = ContentAlignment.MiddleLeft,
                 UseMnemonic = false
@@ -598,7 +599,7 @@ namespace MetriX.UI
             _monitorContentPanel.Controls.Add(cardUsage);
 
             // Card 2: Active Connection & Session Telemetry
-            int cardY = 256;
+            int cardY = 284;
             _cardSession = new Panel
             {
                 Location = new Point(14, cardY),
@@ -639,7 +640,7 @@ namespace MetriX.UI
                 Text = "Session: ▲ 0 B  |  ▼ 0 B  (00:00:00)",
                 Font = new Font("Segoe UI", 8.0f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(215, 215, 220),
-                Location = new Point(10, 38),
+                Location = new Point(10, 39),
                 Size = new Size(w - 20, 16),
                 UseMnemonic = false
             };
@@ -649,14 +650,14 @@ namespace MetriX.UI
                 Text = "Data Quota: Unlimited",
                 Font = new Font("Segoe UI", 7.5f, FontStyle.Regular),
                 ForeColor = Color.FromArgb(100, 200, 255),
-                Location = new Point(10, 54),
+                Location = new Point(10, 56),
                 Size = new Size(w - 20, 16),
                 UseMnemonic = false
             };
 
             _quotaProgressBar = new Panel
             {
-                Location = new Point(10, 71),
+                Location = new Point(10, 74),
                 Size = new Size(w - 20, 4),
                 BackColor = Color.FromArgb(24, 24, 28),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
@@ -690,7 +691,7 @@ namespace MetriX.UI
 
             _pnlTopApps = new DoubleBufferedPanel
             {
-                Location = new Point(10, 78),
+                Location = new Point(10, 82),
                 Size = new Size(w - 20, 126),
                 BackColor = Color.Transparent,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
@@ -735,24 +736,48 @@ namespace MetriX.UI
         {
             if (_pnlTopApps == null || _cardSession == null || _monitorContentPanel == null || _panelMonitor == null) return;
 
+            int availH = _panelMonitor.ClientSize.Height > 0 ? _panelMonitor.ClientSize.Height : 469;
+
             int configuredLimit = _configService.Config.TopAppsLimit;
             int maxDisplay = configuredLimit <= 0 ? _currentTopApps.Count : configuredLimit;
             int count = Math.Min(maxDisplay, _currentTopApps.Count);
+            if (count <= 0) count = 1;
 
-            int rowH = 20;
-            int gap = 2;
-            int neededTopAppsH = 16 + Math.Max(1, count) * (rowH + gap) + 4;
-            _pnlTopApps.Height = neededTopAppsH;
-            _cardSession.Height = 78 + neededTopAppsH + 8;
+            int baseRowH = 24;
+            int gap = 3;
+            int startY = 18;
+            int minNeededTopAppsH = startY + (count * (baseRowH + gap)) + 4;
+            int minCardH = 82 + minNeededTopAppsH + 8;
 
-            int totalH = _cardSession.Bottom + 14;
-            _monitorContentPanel.Height = Math.Max(_panelMonitor.Height, totalH);
+            int bottomMargin = 10;
+            int maxAvailableCardH = availH - _cardSession.Top - bottomMargin;
+
+            if (maxAvailableCardH >= minCardH)
+            {
+                // Plenty of room: expand card to fill the available viewport down to bottom margin (ZERO DEAD SPACE!)
+                _cardSession.Height = maxAvailableCardH;
+                _pnlTopApps.Height = _cardSession.Height - 82 - 8;
+
+                // Dynamically expand row height if extra vertical space exists
+                int usableAppsH = _pnlTopApps.Height - startY - 4;
+                _computedTopAppsRowH = Math.Min(32, Math.Max(baseRowH, (usableAppsH - (count * gap)) / count));
+            }
+            else
+            {
+                // Constrained view: size to content and enable smooth scrolling
+                _computedTopAppsRowH = baseRowH;
+                _pnlTopApps.Height = minNeededTopAppsH;
+                _cardSession.Height = minCardH;
+            }
+
+            int totalH = _cardSession.Bottom + bottomMargin;
+            _monitorContentPanel.Height = Math.Max(availH, totalH);
 
             if (_monitorScrollBar != null)
             {
                 _monitorScrollBar.Maximum = totalH;
-                _monitorScrollBar.ViewportSize = _panelMonitor.Height;
-                _monitorScrollBar.Visible = totalH > _panelMonitor.Height;
+                _monitorScrollBar.ViewportSize = availH;
+                _monitorScrollBar.Visible = totalH > availH;
             }
         }
 
@@ -1442,14 +1467,14 @@ namespace MetriX.UI
             var stats = _networkMonitor != null ? _networkMonitor.CurrentStats : null;
             double totalBandwidth = stats != null ? (stats.DownloadSpeedBytesPerSec + stats.UploadSpeedBytesPerSec) : 0;
 
-            int rowH = 20;
-            int gap = 2;
-            int startY = 16;
+            int rowH = _computedTopAppsRowH > 0 ? _computedTopAppsRowH : 24;
+            int gap = 3;
+            int startY = 18;
 
-            using (var nameFont = new Font("Segoe UI", 8.0f, FontStyle.Bold))
-            using (var rateFont = new Font("Segoe UI", 7.5f, FontStyle.Bold))
-            using (var badgeFont = new Font("Segoe UI", 7.0f, FontStyle.Regular))
-            using (var iconFont = new Font("Segoe UI Emoji", 8.0f, FontStyle.Regular))
+            using (var nameFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
+            using (var rateFont = new Font("Segoe UI", 8.0f, FontStyle.Bold))
+            using (var badgeFont = new Font("Segoe UI", 7.5f, FontStyle.Regular))
+            using (var iconFont = new Font("Segoe UI Emoji", 8.5f, FontStyle.Regular))
             using (var rowBg = new SolidBrush(Color.FromArgb(38, 38, 44)))
             using (var rowBorder = new Pen(Color.FromArgb(52, 52, 60), 1))
             using (var nameBrush = new SolidBrush(Color.FromArgb(235, 235, 240)))
@@ -1471,14 +1496,17 @@ namespace MetriX.UI
                         g.DrawPath(rowBorder, path);
                     }
 
-                    // Activity indicator bar along bottom of row
+                    // Activity indicator bar along bottom of row (3px thickness)
                     double shareRatio = app.AttributionWeight / totalWeight;
                     int barW = Math.Max(4, (int)((w - 4) * shareRatio));
-                    g.FillRectangle(barBrush, 2, py + rowH - 2, barW, 2);
+                    g.FillRectangle(barBrush, 2, py + rowH - 3, barW, 3);
+
+                    // Vertical centering offset
+                    int textY = py + (rowH - 17) / 2;
 
                     // Category Icon (X = 6)
                     string icon = GetAppCategoryIcon(app.ProcessName);
-                    g.DrawString(icon, iconFont, nameBrush, 6, py + 2);
+                    g.DrawString(icon, iconFont, nameBrush, 6, textY);
 
                     // Real-time Bandwidth Consumption (right-aligned)
                     string rateText;
@@ -1496,7 +1524,7 @@ namespace MetriX.UI
                     }
                     SizeF rateSz = g.MeasureString(rateText, rateFont);
                     float rx = w - rateSz.Width - 8;
-                    g.DrawString(rateText, rateFont, currentRateBrush, rx, py + 3);
+                    g.DrawString(rateText, rateFont, currentRateBrush, rx, textY);
 
                     // App Name (between icon and consumption stats)
                     float nameX = 26;
@@ -1512,7 +1540,7 @@ namespace MetriX.UI
                         displayName += "…";
                         nameSz = g.MeasureString(displayName, nameFont);
                     }
-                    g.DrawString(displayName, nameFont, nameBrush, nameX, py + 2);
+                    g.DrawString(displayName, nameFont, nameBrush, nameX, textY);
 
                     // Subtle, clean socket count text e.g. "(17 conn)" right beside name
                     float connX = nameX + nameSz.Width + 4;
@@ -1520,7 +1548,7 @@ namespace MetriX.UI
                     {
                         using (var mutedBrush = new SolidBrush(Color.FromArgb(135, 135, 142)))
                         {
-                            g.DrawString(string.Format("({0} conn)", app.ActiveConnections), badgeFont, mutedBrush, connX, py + 3);
+                            g.DrawString(string.Format("({0} conn)", app.ActiveConnections), badgeFont, mutedBrush, connX, textY + 1);
                         }
                     }
                 }
