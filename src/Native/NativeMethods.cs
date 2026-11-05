@@ -227,6 +227,15 @@ namespace MetriX.Native
         [DllImport("user32.dll")]
         public static extern uint GetDpiForWindow(IntPtr hWnd);
 
+        // Memory Working Set Trimming (psapi.dll & kernel32.dll)
+        [DllImport("psapi.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool EmptyWorkingSet(IntPtr hProcess);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool SetProcessWorkingSetSize(IntPtr hProcess, IntPtr dwMinimumWorkingSetSize, IntPtr dwMaximumWorkingSetSize);
+
         // Network APIs (iphlpapi.dll)
         [DllImport("iphlpapi.dll", SetLastError = true)]
         public static extern int GetIfTable2(out IntPtr pIfTable2);

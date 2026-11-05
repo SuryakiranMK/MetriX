@@ -12,8 +12,10 @@
 
 # Release artifacts
 dist/
+releases/
 *.zip
 SHA256SUMS.txt
+docs/release-notes/
 release_notes*.md
 [Ss][Cc][Hh][Ee][Dd][Uu][Ll][Ee].[Mm][Dd]
 

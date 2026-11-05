@@ -11,8 +11,11 @@ Copy-Item "d:\Other\metriX\app.ico" (Join-Path $stagingDir "app.ico")
 Copy-Item "d:\Other\metriX\README.md" (Join-Path $stagingDir "README.md")
 Copy-Item "d:\Other\metriX\LICENSE" (Join-Path $stagingDir "LICENSE")
 
+$releasesDir = "d:\Other\metriX\releases"
+if (-not (Test-Path $releasesDir)) { New-Item -ItemType Directory -Path $releasesDir | Out-Null }
+
 $zipName = "metriX-$Version-windows-x64.zip"
-$zipPath = Join-Path "d:\Other\metriX" $zipName
+$zipPath = Join-Path $releasesDir $zipName
 if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 Compress-Archive -Path "$stagingDir\*" -DestinationPath $zipPath
 

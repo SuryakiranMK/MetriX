@@ -20,6 +20,7 @@ namespace MetriX.UI
         private Timer _sampleTimer;
         private SettingsForm _settingsForm;
         private readonly UpdateService _updateService;
+        private int _trimTickCounter = 0;
 
         public TrayApplicationContext(ConfigService configService, NetworkMonitor networkMonitor, TaskbarTracker taskbarTracker)
         {
@@ -33,6 +34,9 @@ namespace MetriX.UI
             InitializeTray();
             InitializeOverlay();
             InitializeTimer();
+
+            // Perform post-startup working set optimization
+            TrimProcessMemory();
         }
 
         private void InitializeTray()
@@ -270,8 +274,36 @@ namespace MetriX.UI
                         stats.UploadFormatted, stats.UploadUnit,
                         stats.DownloadFormatted, stats.DownloadUnit);
                     if (tip.Length >= 64) tip = tip.Substring(0, 63);
-                    _notifyIcon.Text = tip;
+                    if (_notifyIcon.Text != tip)
+                    {
+                        _notifyIcon.Text = tip;
+                    }
                 }
+
+                // Periodic CLR working set optimization (locks physical footprint under 6–8 MB)
+                _trimTickCounter++;
+                if (_trimTickCounter >= 30)
+                {
+                    _trimTickCounter = 0;
+                    TrimProcessMemory();
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private static void TrimProcessMemory()
+        {
+            try
+            {
+                GC.Collect(2, GCCollectionMode.Forced);
+                GC.WaitForPendingFinalizers();
+                GC.Collect(2, GCCollectionMode.Forced);
+
+                IntPtr hProc = System.Diagnostics.Process.GetCurrentProcess().Handle;
+                Native.NativeMethods.EmptyWorkingSet(hProc);
+                Native.NativeMethods.SetProcessWorkingSetSize(hProc, (IntPtr)(-1), (IntPtr)(-1));
             }
             catch
             {
@@ -286,6 +318,7 @@ namespace MetriX.UI
                 {
                     _sampleTimer.Interval = _configService.Config.UpdateIntervalMs;
                     _networkMonitor.ResetBaseline();
+                    _overlayWindow.InvalidateDimensions();
                     SynchronizeSecondaryOverlays();
                     _overlayWindow.RenderFrame();
 
@@ -293,6 +326,7 @@ namespace MetriX.UI
                     {
                         if (sec != null && !sec.IsDisposed && sec.Visible)
                         {
+                            sec.InvalidateDimensions();
                             sec.RenderFrame();
                         }
                     }

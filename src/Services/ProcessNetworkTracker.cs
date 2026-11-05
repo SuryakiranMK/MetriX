@@ -79,8 +79,10 @@ namespace MetriX.Services
                         {
                             try
                             {
-                                var proc = Process.GetProcessById(kvp.Key);
-                                procName = proc.ProcessName;
+                                using (var proc = Process.GetProcessById(kvp.Key))
+                                {
+                                    procName = proc.ProcessName;
+                                }
                             }
                             catch
                             {

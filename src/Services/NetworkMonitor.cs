@@ -22,7 +22,10 @@ namespace MetriX.Services
         private bool _isFirstSample = true;
 
         private readonly object _historyLock = new object();
-        private readonly List<NetworkHistoryPoint> _history = new List<NetworkHistoryPoint>(300);
+        private const int MaxHistory = 300;
+        private readonly NetworkHistoryPoint[] _history = new NetworkHistoryPoint[MaxHistory];
+        private int _historyCount = 0;
+        private int _historyHead = 0;
 
         public NetworkStats CurrentStats { get; private set; }
         public ulong SessionDownloadedBytes { get; private set; }
@@ -41,6 +44,12 @@ namespace MetriX.Services
             ActiveAdapterName = "Auto-Detect";
             ActiveAdapterDescription = "All Network Adapters";
             UsageTracker = new DataUsageTracker();
+
+            // Pre-instantiate history points to achieve zero allocation in sampling loop
+            for (int i = 0; i < MaxHistory; i++)
+            {
+                _history[i] = new NetworkHistoryPoint();
+            }
         }
 
         public void ResetBaseline()
@@ -59,7 +68,36 @@ namespace MetriX.Services
         {
             lock (_historyLock)
             {
-                return _history.ToArray();
+                var result = new NetworkHistoryPoint[_historyCount];
+                if (_historyCount < MaxHistory)
+                {
+                    for (int i = 0; i < _historyCount; i++)
+                    {
+                        var src = _history[i];
+                        result[i] = new NetworkHistoryPoint
+                        {
+                            Time = src.Time,
+                            DownloadBytesPerSec = src.DownloadBytesPerSec,
+                            UploadBytesPerSec = src.UploadBytesPerSec
+                        };
+                    }
+                }
+                else
+                {
+                    int tail = _historyHead; // Oldest index
+                    for (int i = 0; i < MaxHistory; i++)
+                    {
+                        int idx = (tail + i) % MaxHistory;
+                        var src = _history[idx];
+                        result[i] = new NetworkHistoryPoint
+                        {
+                            Time = src.Time,
+                            DownloadBytesPerSec = src.DownloadBytesPerSec,
+                            UploadBytesPerSec = src.UploadBytesPerSec
+                        };
+                    }
+                }
+                return result;
             }
         }
 
@@ -75,7 +113,7 @@ namespace MetriX.Services
                 if (ret == 0 && pTable != IntPtr.Zero)
                 {
                     uint numEntries = (uint)Marshal.ReadInt32(pTable);
-                    int rowSize = Marshal.SizeOf(typeof(NativeMethods.MIB_IF_ROW2));
+                    const int rowSize = 1352;
                     int offset = IntPtr.Size == 8 ? 8 : 4;
 
                     string targetAlias = config != null ? config.SelectedAdapterAlias : null;
@@ -84,41 +122,51 @@ namespace MetriX.Services
                     for (int i = 0; i < numEntries; i++)
                     {
                         IntPtr rowPtr = new IntPtr(pTable.ToInt64() + offset + (i * (long)rowSize));
-                        var row = (NativeMethods.MIB_IF_ROW2)Marshal.PtrToStructure(rowPtr, typeof(NativeMethods.MIB_IF_ROW2));
 
-                        // Filter out NDIS light-weight filter drivers
-                        bool isFilter = (row.InterfaceAndOperStatusFlags & 0x02) != 0;
-                        if (isFilter)
-                            continue;
+                        // Offset 1152: InterfaceAndOperStatusFlags (byte)
+                        byte flags = Marshal.ReadByte(rowPtr, 1152);
+                        bool isFilter = (flags & 0x02) != 0;
+                        if (isFilter) continue;
 
-                        // Filter out loopback (Type 24)
-                        if (row.Type == 24)
-                            continue;
+                        // Offset 1128: Type (int / uint). 24 is loopback
+                        int type = Marshal.ReadInt32(rowPtr, 1128);
+                        if (type == 24) continue;
 
                         if (matchSpecific)
                         {
-                            if (string.Equals(row.Alias, targetAlias, StringComparison.OrdinalIgnoreCase) ||
-                                string.Equals(row.Description, targetAlias, StringComparison.OrdinalIgnoreCase))
+                            string alias = Marshal.PtrToStringUni(new IntPtr(rowPtr.ToInt64() + 28));
+                            string desc = Marshal.PtrToStringUni(new IntPtr(rowPtr.ToInt64() + 540));
+                            if (string.Equals(alias, targetAlias, StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(desc, targetAlias, StringComparison.OrdinalIgnoreCase))
                             {
-                                currentIn += row.InOctets;
-                                currentOut += row.OutOctets;
+                                currentIn += (ulong)Marshal.ReadInt64(rowPtr, 1208);
+                                currentOut += (ulong)Marshal.ReadInt64(rowPtr, 1280);
                                 break;
                             }
                         }
                         else
                         {
-                            // Count all active interfaces (OperStatus == 1 is IfOperStatusUp)
-                            if (row.OperStatus == 1)
+                            // Offset 1156: OperStatus (int). 1 is IfOperStatusUp
+                            int operStatus = Marshal.ReadInt32(rowPtr, 1156);
+                            if (operStatus == 1)
                             {
-                                currentIn += row.InOctets;
-                                currentOut += row.OutOctets;
+                                currentIn += (ulong)Marshal.ReadInt64(rowPtr, 1208);
+                                currentOut += (ulong)Marshal.ReadInt64(rowPtr, 1280);
 
-                                if (!string.IsNullOrEmpty(row.Alias))
+                                ulong txSpeed = (ulong)Marshal.ReadInt64(rowPtr, 1192);
+                                ulong rxSpeed = (ulong)Marshal.ReadInt64(rowPtr, 1200);
+                                ulong speed = Math.Max(txSpeed, rxSpeed);
+                                if (speed > 0) ActiveLinkSpeed = speed;
+
+                                if (string.IsNullOrEmpty(ActiveAdapterName) || ActiveAdapterName == "Auto-Detect")
                                 {
-                                    ActiveAdapterName = row.Alias;
-                                    ActiveAdapterDescription = row.Description;
-                                    ulong speed = Math.Max(row.TransmitLinkSpeed, row.ReceiveLinkSpeed);
-                                    if (speed > 0) ActiveLinkSpeed = speed;
+                                    string alias = Marshal.PtrToStringUni(new IntPtr(rowPtr.ToInt64() + 28));
+                                    string desc = Marshal.PtrToStringUni(new IntPtr(rowPtr.ToInt64() + 540));
+                                    if (!string.IsNullOrEmpty(alias))
+                                    {
+                                        ActiveAdapterName = alias;
+                                        ActiveAdapterDescription = desc;
+                                    }
                                 }
                             }
                         }
@@ -182,16 +230,13 @@ namespace MetriX.Services
 
             lock (_historyLock)
             {
-                _history.Add(new NetworkHistoryPoint
-                {
-                    Time = DateTime.Now,
-                    DownloadBytesPerSec = CurrentStats.DownloadSpeedBytesPerSec,
-                    UploadBytesPerSec = CurrentStats.UploadSpeedBytesPerSec
-                });
-                if (_history.Count > 300)
-                {
-                    _history.RemoveAt(0);
-                }
+                var pt = _history[_historyHead];
+                pt.Time = DateTime.Now;
+                pt.DownloadBytesPerSec = CurrentStats.DownloadSpeedBytesPerSec;
+                pt.UploadBytesPerSec = CurrentStats.UploadSpeedBytesPerSec;
+
+                _historyHead = (_historyHead + 1) % MaxHistory;
+                if (_historyCount < MaxHistory) _historyCount++;
             }
 
             _lastTimestamp = currentTimestamp;
@@ -212,24 +257,28 @@ namespace MetriX.Services
                 if (ret == 0 && pTable != IntPtr.Zero)
                 {
                     uint numEntries = (uint)Marshal.ReadInt32(pTable);
-                    int rowSize = Marshal.SizeOf(typeof(NativeMethods.MIB_IF_ROW2));
+                    const int rowSize = 1352;
                     int offset = IntPtr.Size == 8 ? 8 : 4;
 
                     for (int i = 0; i < numEntries; i++)
                     {
                         IntPtr rowPtr = new IntPtr(pTable.ToInt64() + offset + (i * (long)rowSize));
-                        var row = (NativeMethods.MIB_IF_ROW2)Marshal.PtrToStructure(rowPtr, typeof(NativeMethods.MIB_IF_ROW2));
 
-                        bool isFilter = (row.InterfaceAndOperStatusFlags & 0x02) != 0;
-                        if (isFilter || row.Type == 24)
-                            continue;
+                        byte flags = Marshal.ReadByte(rowPtr, 1152);
+                        bool isFilter = (flags & 0x02) != 0;
+                        int type = Marshal.ReadInt32(rowPtr, 1128);
+                        if (isFilter || type == 24) continue;
+
+                        int operStatus = Marshal.ReadInt32(rowPtr, 1156);
+                        string alias = Marshal.PtrToStringUni(new IntPtr(rowPtr.ToInt64() + 28));
+                        string desc = Marshal.PtrToStringUni(new IntPtr(rowPtr.ToInt64() + 540));
 
                         list.Add(new AdapterInfo
                         {
-                            Alias = row.Alias,
-                            Description = row.Description,
-                            Type = row.Type,
-                            IsUp = row.OperStatus == 1
+                            Alias = alias,
+                            Description = desc,
+                            Type = (uint)type,
+                            IsUp = operStatus == 1
                         });
                     }
                 }

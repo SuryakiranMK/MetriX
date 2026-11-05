@@ -29,6 +29,29 @@ namespace MetriX.UI
         private IntPtr _hMouseHook = IntPtr.Zero;
         private Rectangle _lastRenderedBounds = Rectangle.Empty;
 
+        // Cached GDI resources & persistent backbuffer (zero allocation during polling)
+        private Font _cachedFont;
+        private Font _cachedUnitFont;
+        private string _cachedFontKey;
+        private int _cachedWidth = 0;
+        private int _cachedHeight = 0;
+        private bool _dimensionsDirty = true;
+        private float _lastDpiScale = 1.0f;
+
+        private IntPtr _cachedMemDC = IntPtr.Zero;
+        private IntPtr _cachedHBitmap = IntPtr.Zero;
+        private IntPtr _cachedOldBmp = IntPtr.Zero;
+        private int _cachedDIBWidth = 0;
+        private int _cachedDIBHeight = 0;
+
+        private SolidBrush _cachedUpBrush;
+        private SolidBrush _cachedDnBrush;
+        private SolidBrush _cachedLblBrush;
+        private SolidBrush _cachedHitTestBrush;
+        private Color _cachedUpColor = Color.Empty;
+        private Color _cachedDnColor = Color.Empty;
+        private Color _cachedLblColor = Color.Empty;
+
         public event Action RequestOpenSettings;
         public event Action RequestToggleFlyout;
         public event Action RequestCheckUpdates;
@@ -263,6 +286,7 @@ namespace MetriX.UI
             var cfg = _configService.Config;
             cfg.FloatingScale = scale;
             _configService.Save(cfg);
+            InvalidateDimensions();
             RenderFrame();
         }
 
@@ -376,11 +400,84 @@ namespace MetriX.UI
             return NativeMethods.CallNextHookEx(_hMouseHook, nCode, wParam, lParam);
         }
 
+        public void InvalidateDimensions()
+        {
+            _dimensionsDirty = true;
+        }
+
+        private void ReleaseCachedGdiResources()
+        {
+            if (_cachedFont != null) { _cachedFont.Dispose(); _cachedFont = null; }
+            if (_cachedUnitFont != null) { _cachedUnitFont.Dispose(); _cachedUnitFont = null; }
+            if (_cachedUpBrush != null) { _cachedUpBrush.Dispose(); _cachedUpBrush = null; }
+            if (_cachedDnBrush != null) { _cachedDnBrush.Dispose(); _cachedDnBrush = null; }
+            if (_cachedLblBrush != null) { _cachedLblBrush.Dispose(); _cachedLblBrush = null; }
+            if (_cachedHitTestBrush != null) { _cachedHitTestBrush.Dispose(); _cachedHitTestBrush = null; }
+
+            ReleaseDIBSection();
+        }
+
+        private void ReleaseDIBSection()
+        {
+            if (_cachedOldBmp != IntPtr.Zero && _cachedMemDC != IntPtr.Zero)
+            {
+                NativeMethods.SelectObject(_cachedMemDC, _cachedOldBmp);
+                _cachedOldBmp = IntPtr.Zero;
+            }
+            if (_cachedHBitmap != IntPtr.Zero)
+            {
+                NativeMethods.DeleteObject(_cachedHBitmap);
+                _cachedHBitmap = IntPtr.Zero;
+            }
+            if (_cachedMemDC != IntPtr.Zero)
+            {
+                NativeMethods.DeleteDC(_cachedMemDC);
+                _cachedMemDC = IntPtr.Zero;
+            }
+            _cachedDIBWidth = 0;
+            _cachedDIBHeight = 0;
+        }
+
+        private void EnsureDIBSection(int width, int height)
+        {
+            if (_cachedMemDC != IntPtr.Zero && _cachedHBitmap != IntPtr.Zero &&
+                _cachedDIBWidth == width && _cachedDIBHeight == height)
+            {
+                return;
+            }
+
+            ReleaseDIBSection();
+
+            IntPtr screenDC = NativeMethods.GetDC(IntPtr.Zero);
+            try
+            {
+                _cachedMemDC = NativeMethods.CreateCompatibleDC(screenDC);
+                NativeMethods.BITMAPINFO bmi = new NativeMethods.BITMAPINFO();
+                bmi.bmiHeader.biSize = (uint)Marshal.SizeOf(typeof(NativeMethods.BITMAPINFOHEADER));
+                bmi.bmiHeader.biWidth = width;
+                bmi.bmiHeader.biHeight = -height; // Top-down DIB
+                bmi.bmiHeader.biPlanes = 1;
+                bmi.bmiHeader.biBitCount = 32;
+                bmi.bmiHeader.biCompression = NativeMethods.BI_RGB;
+
+                IntPtr pBits;
+                _cachedHBitmap = NativeMethods.CreateDIBSection(_cachedMemDC, ref bmi, NativeMethods.DIB_RGB_COLORS, out pBits, IntPtr.Zero, 0);
+                _cachedOldBmp = NativeMethods.SelectObject(_cachedMemDC, _cachedHBitmap);
+                _cachedDIBWidth = width;
+                _cachedDIBHeight = height;
+            }
+            finally
+            {
+                if (screenDC != IntPtr.Zero) NativeMethods.ReleaseDC(IntPtr.Zero, screenDC);
+            }
+        }
+
         protected override void Dispose(bool disposing)
         {
             if (disposing)
             {
                 StopOutsideClickWatcher();
+                ReleaseCachedGdiResources();
             }
             base.Dispose(disposing);
         }
@@ -389,6 +486,7 @@ namespace MetriX.UI
         {
             _configService.Config.Layout = mode;
             _configService.Save(_configService.Config);
+            InvalidateDimensions();
             RenderFrame();
         }
 
@@ -398,6 +496,7 @@ namespace MetriX.UI
             _configService.Config.OffsetX = 0;
             _configService.Config.OffsetY = 0;
             _configService.Save(_configService.Config);
+            InvalidateDimensions();
             RenderFrame();
         }
 
@@ -426,9 +525,16 @@ namespace MetriX.UI
             var stats = _networkMonitor.CurrentStats;
             float dpiScale = DpiHelper.GetDpiScale(Handle);
 
-            // Determine dimensions
-            int width, height;
-            MeasureDimensions(cfg, stats, dpiScale, out width, out height);
+            // Determine dimensions (cached to avoid per-tick string measurement & font allocations)
+            if (_dimensionsDirty || Math.Abs(dpiScale - _lastDpiScale) > 0.01f || _cachedWidth <= 0 || _cachedHeight <= 0)
+            {
+                MeasureDimensions(cfg, stats, dpiScale, out _cachedWidth, out _cachedHeight);
+                _dimensionsDirty = false;
+                _lastDpiScale = dpiScale;
+            }
+
+            int width = _cachedWidth;
+            int height = _cachedHeight;
 
             // Calculate coordinates
             Rectangle bounds;
@@ -541,26 +647,13 @@ namespace MetriX.UI
 
         private void DrawLayeredFrame(Rectangle bounds, int width, int height, AppConfig cfg, NetworkStats stats, float dpiScale)
         {
-            IntPtr screenDC = NativeMethods.GetDC(IntPtr.Zero);
-            IntPtr memDC = NativeMethods.CreateCompatibleDC(screenDC);
-            IntPtr hBitmap = IntPtr.Zero;
-            IntPtr hOldBmp = IntPtr.Zero;
-            IntPtr pBits;
+            EnsureDIBSection(width, height);
+            if (_cachedMemDC == IntPtr.Zero) return;
 
+            IntPtr screenDC = NativeMethods.GetDC(IntPtr.Zero);
             try
             {
-                NativeMethods.BITMAPINFO bmi = new NativeMethods.BITMAPINFO();
-                bmi.bmiHeader.biSize = (uint)Marshal.SizeOf(typeof(NativeMethods.BITMAPINFOHEADER));
-                bmi.bmiHeader.biWidth = width;
-                bmi.bmiHeader.biHeight = -height; // Top-down DIB
-                bmi.bmiHeader.biPlanes = 1;
-                bmi.bmiHeader.biBitCount = 32;
-                bmi.bmiHeader.biCompression = NativeMethods.BI_RGB;
-
-                hBitmap = NativeMethods.CreateDIBSection(memDC, ref bmi, NativeMethods.DIB_RGB_COLORS, out pBits, IntPtr.Zero, 0);
-                hOldBmp = NativeMethods.SelectObject(memDC, hBitmap);
-
-                using (Graphics g = Graphics.FromHdc(memDC))
+                using (Graphics g = Graphics.FromHdc(_cachedMemDC))
                 {
                     g.SmoothingMode = SmoothingMode.AntiAlias;
                     g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
@@ -586,13 +679,11 @@ namespace MetriX.UI
                     }
                     else
                     {
-                        // Fill entire bounds with imperceptible Alpha=1 floor.
-                        // This prevents the cursor from falling through Alpha=0 pixels to Shell_TrayWnd,
-                        // which causes Windows 11 taskbar to fight for focus and flicker/vanish.
-                        using (Brush hitTestBrush = new SolidBrush(Color.FromArgb(1, 0, 0, 0)))
+                        if (_cachedHitTestBrush == null)
                         {
-                            g.FillRectangle(hitTestBrush, 0, 0, width, height);
+                            _cachedHitTestBrush = new SolidBrush(Color.FromArgb(1, 0, 0, 0));
                         }
+                        g.FillRectangle(_cachedHitTestBrush, 0, 0, width, height);
 
                         // Hover highlight (Windows 11 subtle rounded pill)
                         if (_isHovered && cfg.ShowHoverHighlight)
@@ -613,38 +704,67 @@ namespace MetriX.UI
                     float scaledFontSize = (float)(cfg.FontSize * scale);
                     float unitSizePt = (float)((cfg.UnitFontSize > 0 ? cfg.UnitFontSize : Math.Max(6.0f, cfg.FontSize * 0.8f)) * scale);
 
-                    using (Font font = CreateFontSafely(fontName, scaledFontSize * dpiScale, style))
-                    using (Font unitFont = CreateFontSafely(fontName, unitSizePt * dpiScale, FontStyle.Regular))
+                    string fontKey = string.Format("{0}_{1}_{2}_{3}_{4}", fontName, scaledFontSize, unitSizePt, (int)style, dpiScale);
+                    if (_cachedFont == null || _cachedUnitFont == null || _cachedFontKey != fontKey)
                     {
-                        Color upColor, dnColor, lblColor;
-                        if (cfg.AutoTheme)
-                        {
-                            string uHex, dHex, lHex;
-                            ThemeHelper.GetThemeColors(ThemeHelper.IsSystemLightTheme(), out uHex, out dHex, out lHex);
-                            upColor = ParseColor(uHex, Color.FromArgb(76, 194, 255));
-                            dnColor = ParseColor(dHex, Color.FromArgb(108, 203, 95));
-                            lblColor = ParseColor(lHex, Color.FromArgb(208, 208, 208));
-                        }
-                        else
-                        {
-                            upColor = ParseColor(cfg.UploadColor, Color.FromArgb(76, 194, 255));
-                            dnColor = ParseColor(cfg.DownloadColor, Color.FromArgb(108, 203, 95));
-                            lblColor = ParseColor(cfg.LabelColor, Color.FromArgb(208, 208, 208));
-                        }
+                        if (_cachedFont != null) _cachedFont.Dispose();
+                        if (_cachedUnitFont != null) _cachedUnitFont.Dispose();
 
-                        string upArrow = GetArrowGlyph(cfg.ArrowStyle, true);
-                        string dnArrow = GetArrowGlyph(cfg.ArrowStyle, false);
+                        _cachedFont = CreateFontSafely(fontName, scaledFontSize * dpiScale, style);
+                        _cachedUnitFont = CreateFontSafely(fontName, unitSizePt * dpiScale, FontStyle.Regular);
+                        _cachedFontKey = fontKey;
+                    }
 
-                        int padX = (int)(DpiHelper.Scale(cfg.PaddingX, dpiScale) * scale);
+                    Font font = _cachedFont;
+                    Font unitFont = _cachedUnitFont;
 
-                        if (cfg.Layout == LayoutMode.Stacked)
-                        {
-                            DrawStackedLayout(g, font, unitFont, width, height, padX, upArrow, dnArrow, stats, upColor, dnColor, lblColor, dpiScale);
-                        }
-                        else
-                        {
-                            DrawHorizontalLayout(g, font, unitFont, width, height, padX, upArrow, dnArrow, stats, upColor, dnColor, lblColor, cfg.ItemSpacing, dpiScale);
-                        }
+                    Color upColor, dnColor, lblColor;
+                    if (cfg.AutoTheme)
+                    {
+                        string uHex, dHex, lHex;
+                        ThemeHelper.GetThemeColors(ThemeHelper.IsSystemLightTheme(), out uHex, out dHex, out lHex);
+                        upColor = ParseColor(uHex, Color.FromArgb(76, 194, 255));
+                        dnColor = ParseColor(dHex, Color.FromArgb(108, 203, 95));
+                        lblColor = ParseColor(lHex, Color.FromArgb(208, 208, 208));
+                    }
+                    else
+                    {
+                        upColor = ParseColor(cfg.UploadColor, Color.FromArgb(76, 194, 255));
+                        dnColor = ParseColor(cfg.DownloadColor, Color.FromArgb(108, 203, 95));
+                        lblColor = ParseColor(cfg.LabelColor, Color.FromArgb(208, 208, 208));
+                    }
+
+                    if (_cachedUpColor != upColor || _cachedUpBrush == null)
+                    {
+                        if (_cachedUpBrush != null) _cachedUpBrush.Dispose();
+                        _cachedUpBrush = new SolidBrush(upColor);
+                        _cachedUpColor = upColor;
+                    }
+                    if (_cachedDnColor != dnColor || _cachedDnBrush == null)
+                    {
+                        if (_cachedDnBrush != null) _cachedDnBrush.Dispose();
+                        _cachedDnBrush = new SolidBrush(dnColor);
+                        _cachedDnColor = dnColor;
+                    }
+                    if (_cachedLblColor != lblColor || _cachedLblBrush == null)
+                    {
+                        if (_cachedLblBrush != null) _cachedLblBrush.Dispose();
+                        _cachedLblBrush = new SolidBrush(lblColor);
+                        _cachedLblColor = lblColor;
+                    }
+
+                    string upArrow = GetArrowGlyph(cfg.ArrowStyle, true);
+                    string dnArrow = GetArrowGlyph(cfg.ArrowStyle, false);
+
+                    int padX = (int)(DpiHelper.Scale(cfg.PaddingX, dpiScale) * scale);
+
+                    if (cfg.Layout == LayoutMode.Stacked)
+                    {
+                        DrawStackedLayout(g, font, unitFont, width, height, padX, upArrow, dnArrow, stats, _cachedUpBrush, _cachedDnBrush, _cachedLblBrush, dpiScale);
+                    }
+                    else
+                    {
+                        DrawHorizontalLayout(g, font, unitFont, width, height, padX, upArrow, dnArrow, stats, _cachedUpBrush, _cachedDnBrush, _cachedLblBrush, cfg.ItemSpacing, dpiScale);
                     }
                 }
 
@@ -672,7 +792,7 @@ namespace MetriX.UI
                     screenDC,
                     ref ptDst,
                     ref sizeDst,
-                    memDC,
+                    _cachedMemDC,
                     ref ptSrc,
                     0,
                     ref blend,
@@ -685,15 +805,12 @@ namespace MetriX.UI
             }
             finally
             {
-                if (hOldBmp != IntPtr.Zero) NativeMethods.SelectObject(memDC, hOldBmp);
-                if (hBitmap != IntPtr.Zero) NativeMethods.DeleteObject(hBitmap);
-                if (memDC != IntPtr.Zero) NativeMethods.DeleteDC(memDC);
                 if (screenDC != IntPtr.Zero) NativeMethods.ReleaseDC(IntPtr.Zero, screenDC);
             }
         }
 
         private void DrawStackedLayout(Graphics g, Font font, Font unitFont, int width, int height, int padX,
-            string upArrow, string dnArrow, NetworkStats stats, Color upColor, Color dnColor, Color lblColor, float dpiScale)
+            string upArrow, string dnArrow, NetworkStats stats, Brush upBrush, Brush dnBrush, Brush lblBrush, float dpiScale)
         {
             int rowHeight = height / 2;
             int yRow1 = 2;
@@ -701,79 +818,69 @@ namespace MetriX.UI
 
             float baselineOffset = (font.GetHeight(g) - unitFont.GetHeight(g)) * 0.75f;
 
-            using (Brush upBrush = new SolidBrush(upColor))
-            using (Brush dnBrush = new SolidBrush(dnColor))
-            using (Brush lblBrush = new SolidBrush(lblColor))
+            // Measure widths for right-aligned tabular presentation
+            SizeF upArrowSz = g.MeasureString(upArrow, font);
+            SizeF dnArrowSz = g.MeasureString(dnArrow, font);
+            SizeF upValSz = g.MeasureString(stats.UploadFormatted, font);
+            SizeF dnValSz = g.MeasureString(stats.DownloadFormatted, font);
+
+            float maxArrowW = Math.Max(upArrowSz.Width, dnArrowSz.Width);
+            float maxValW = Math.Max(upValSz.Width, dnValSz.Width);
+
+            // Row 1 (Upload)
+            float x1 = padX;
+            if (!string.IsNullOrEmpty(upArrow))
             {
-                // Measure widths for right-aligned tabular presentation
-                SizeF upArrowSz = g.MeasureString(upArrow, font);
-                SizeF dnArrowSz = g.MeasureString(dnArrow, font);
-                SizeF upValSz = g.MeasureString(stats.UploadFormatted, font);
-                SizeF dnValSz = g.MeasureString(stats.DownloadFormatted, font);
-
-                float maxArrowW = Math.Max(upArrowSz.Width, dnArrowSz.Width);
-                float maxValW = Math.Max(upValSz.Width, dnValSz.Width);
-
-                // Row 1 (Upload)
-                float x1 = padX;
-                if (!string.IsNullOrEmpty(upArrow))
-                {
-                    g.DrawString(upArrow, font, upBrush, x1, yRow1);
-                    x1 += maxArrowW + 2;
-                }
-                // Right-align number
-                float numX1 = x1 + (maxValW - upValSz.Width);
-                g.DrawString(stats.UploadFormatted, font, upBrush, numX1, yRow1);
-                x1 += maxValW + 2;
-                g.DrawString(stats.UploadUnit, unitFont, lblBrush, x1, yRow1 + baselineOffset);
-
-                // Row 2 (Download)
-                float x2 = padX;
-                if (!string.IsNullOrEmpty(dnArrow))
-                {
-                    g.DrawString(dnArrow, font, dnBrush, x2, yRow2);
-                    x2 += maxArrowW + 2;
-                }
-                float numX2 = x2 + (maxValW - dnValSz.Width);
-                g.DrawString(stats.DownloadFormatted, font, dnBrush, numX2, yRow2);
-                x2 += maxValW + 2;
-                g.DrawString(stats.DownloadUnit, unitFont, lblBrush, x2, yRow2 + baselineOffset);
+                g.DrawString(upArrow, font, upBrush, x1, yRow1);
+                x1 += maxArrowW + 2;
             }
+            // Right-align number
+            float numX1 = x1 + (maxValW - upValSz.Width);
+            g.DrawString(stats.UploadFormatted, font, upBrush, numX1, yRow1);
+            x1 += maxValW + 2;
+            g.DrawString(stats.UploadUnit, unitFont, lblBrush, x1, yRow1 + baselineOffset);
+
+            // Row 2 (Download)
+            float x2 = padX;
+            if (!string.IsNullOrEmpty(dnArrow))
+            {
+                g.DrawString(dnArrow, font, dnBrush, x2, yRow2);
+                x2 += maxArrowW + 2;
+            }
+            float numX2 = x2 + (maxValW - dnValSz.Width);
+            g.DrawString(stats.DownloadFormatted, font, dnBrush, numX2, yRow2);
+            x2 += maxValW + 2;
+            g.DrawString(stats.DownloadUnit, unitFont, lblBrush, x2, yRow2 + baselineOffset);
         }
 
         private void DrawHorizontalLayout(Graphics g, Font font, Font unitFont, int width, int height, int padX,
-            string upArrow, string dnArrow, NetworkStats stats, Color upColor, Color dnColor, Color lblColor, int itemSpacing, float dpiScale)
+            string upArrow, string dnArrow, NetworkStats stats, Brush upBrush, Brush dnBrush, Brush lblBrush, int itemSpacing, float dpiScale)
         {
             float yPos = (height - font.GetHeight(g)) / 2f;
             float baselineOffset = (font.GetHeight(g) - unitFont.GetHeight(g)) * 0.75f;
 
-            using (Brush upBrush = new SolidBrush(upColor))
-            using (Brush dnBrush = new SolidBrush(dnColor))
-            using (Brush lblBrush = new SolidBrush(lblColor))
+            float x = padX;
+
+            // Upload block
+            if (!string.IsNullOrEmpty(upArrow))
             {
-                float x = padX;
-
-                // Upload block
-                if (!string.IsNullOrEmpty(upArrow))
-                {
-                    g.DrawString(upArrow, font, upBrush, x, yPos);
-                    x += g.MeasureString(upArrow, font).Width + 1;
-                }
-                g.DrawString(stats.UploadFormatted, font, upBrush, x, yPos);
-                x += g.MeasureString(stats.UploadFormatted, font).Width + 1;
-                g.DrawString(stats.UploadUnit, unitFont, lblBrush, x, yPos + baselineOffset);
-                x += g.MeasureString(stats.UploadUnit, unitFont).Width + DpiHelper.Scale(itemSpacing + 6, dpiScale);
-
-                // Download block
-                if (!string.IsNullOrEmpty(dnArrow))
-                {
-                    g.DrawString(dnArrow, font, dnBrush, x, yPos);
-                    x += g.MeasureString(dnArrow, font).Width + 1;
-                }
-                g.DrawString(stats.DownloadFormatted, font, dnBrush, x, yPos);
-                x += g.MeasureString(stats.DownloadFormatted, font).Width + 1;
-                g.DrawString(stats.DownloadUnit, unitFont, lblBrush, x, yPos + baselineOffset);
+                g.DrawString(upArrow, font, upBrush, x, yPos);
+                x += g.MeasureString(upArrow, font).Width + 1;
             }
+            g.DrawString(stats.UploadFormatted, font, upBrush, x, yPos);
+            x += g.MeasureString(stats.UploadFormatted, font).Width + 1;
+            g.DrawString(stats.UploadUnit, unitFont, lblBrush, x, yPos + baselineOffset);
+            x += g.MeasureString(stats.UploadUnit, unitFont).Width + DpiHelper.Scale(itemSpacing + 6, dpiScale);
+
+            // Download block
+            if (!string.IsNullOrEmpty(dnArrow))
+            {
+                g.DrawString(dnArrow, font, dnBrush, x, yPos);
+                x += g.MeasureString(dnArrow, font).Width + 1;
+            }
+            g.DrawString(stats.DownloadFormatted, font, dnBrush, x, yPos);
+            x += g.MeasureString(stats.DownloadFormatted, font).Width + 1;
+            g.DrawString(stats.DownloadUnit, unitFont, lblBrush, x, yPos + baselineOffset);
         }
 
         private static string GetArrowGlyph(ArrowStyle style, bool isUpload)
