@@ -78,6 +78,10 @@ namespace MetriX.Model
         public double MonthlyDataQuotaGb { get; set; }
         public bool EnableAutoUpdateCheck { get; set; }
         public bool EnableSilentAutoUpdate { get; set; }
+        public bool IsFloatingMode { get; set; }
+        public int FloatingX { get; set; }
+        public int FloatingY { get; set; }
+        public bool FloatingAlwaysOnTop { get; set; }
 
         public AppConfig()
         {
@@ -120,6 +124,11 @@ namespace MetriX.Model
             MonthlyDataQuotaGb = 0.0;
             EnableAutoUpdateCheck = true;
             EnableSilentAutoUpdate = false;
+
+            IsFloatingMode = false;
+            FloatingX = -1;
+            FloatingY = -1;
+            FloatingAlwaysOnTop = true;
         }
     }
 }

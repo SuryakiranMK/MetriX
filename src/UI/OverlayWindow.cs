@@ -22,6 +22,7 @@ namespace MetriX.UI
         private bool _isHovered;
         private bool _isDragging;
         private Point _dragStartPoint;
+        private Point _initialWindowLocation;
         private int _initialOffsetX;
         private ContextMenuStrip _contextMenu;
 
@@ -87,6 +88,17 @@ namespace MetriX.UI
             try
             {
                 if (!IsHandleCreated) return;
+                var cfg = _configService.Config;
+                if (cfg.IsFloatingMode)
+                {
+                    IntPtr currentOwner = NativeMethods.GetWindowLongPtr(Handle, NativeMethods.GWLP_HWNDPARENT);
+                    if (currentOwner != IntPtr.Zero)
+                    {
+                        NativeMethods.SetWindowLongPtr(Handle, NativeMethods.GWLP_HWNDPARENT, IntPtr.Zero);
+                    }
+                    return;
+                }
+
                 IntPtr hTaskbar = _secondaryTaskbarHandle != IntPtr.Zero
                     ? _secondaryTaskbarHandle
                     : (_taskbarTracker != null ? _taskbarTracker.TaskbarHandle : IntPtr.Zero);
@@ -124,6 +136,15 @@ namespace MetriX.UI
                 if (RequestCheckUpdates != null) RequestCheckUpdates();
             });
 
+            var itemFloating = new ToolStripMenuItem("📌  Detach to Floating Widget", null, (s, e) =>
+            {
+                var cfg = _configService.Config;
+                cfg.IsFloatingMode = !cfg.IsFloatingMode;
+                _configService.Save(cfg);
+                EnsureTaskbarOwnership();
+                RenderFrame();
+            });
+
             var itemLayout = new ToolStripMenuItem("🔄  Display Layout");
             itemLayout.DropDown.Renderer = new Windows11MenuRenderer();
             var itemStacked = new ToolStripMenuItem("Stacked (2 Rows)", null, (s, e) => ToggleLayout(LayoutMode.Stacked));
@@ -159,13 +180,16 @@ namespace MetriX.UI
                 itemTray.Checked = (cfg.Position == PositionMode.LeftOfTray);
                 itemLeft.Checked = (cfg.Position == PositionMode.FarLeft);
                 itemApps.Checked = (cfg.Position == PositionMode.RightOfApps);
+                itemPosition.Enabled = !cfg.IsFloatingMode;
                 itemStartup.Checked = cfg.StartWithWindows;
+                itemFloating.Text = cfg.IsFloatingMode ? "📌  Dock back to Taskbar" : "📌  Detach to Floating Widget";
             };
 
             _contextMenu.Items.Add(itemFlyout);
             _contextMenu.Items.Add(itemSettings);
             _contextMenu.Items.Add(itemUpdates);
             _contextMenu.Items.Add(new ToolStripSeparator());
+            _contextMenu.Items.Add(itemFloating);
             _contextMenu.Items.Add(itemLayout);
             _contextMenu.Items.Add(itemPosition);
             _contextMenu.Items.Add(itemTaskMgr);
@@ -219,9 +243,25 @@ namespace MetriX.UI
             int width, height;
             MeasureDimensions(cfg, stats, dpiScale, out width, out height);
 
-            // Calculate Taskbar coordinates
+            // Calculate coordinates
             Rectangle bounds;
-            if (_secondaryTaskbarHandle != IntPtr.Zero)
+            if (cfg.IsFloatingMode)
+            {
+                if (_secondaryTaskbarHandle != IntPtr.Zero)
+                {
+                    if (Visible) Visible = false;
+                    return;
+                }
+
+                if (cfg.FloatingX < 0 || cfg.FloatingY < 0)
+                {
+                    Rectangle workArea = Screen.PrimaryScreen.WorkingArea;
+                    cfg.FloatingX = workArea.Right - width - 24;
+                    cfg.FloatingY = workArea.Bottom - height - 24;
+                }
+                bounds = new Rectangle(cfg.FloatingX, cfg.FloatingY, width, height);
+            }
+            else if (_secondaryTaskbarHandle != IntPtr.Zero)
             {
                 bounds = _taskbarTracker.CalculateSecondaryBounds(_secondaryTaskbarHandle, width, height);
                 if (bounds.IsEmpty)
@@ -251,7 +291,7 @@ namespace MetriX.UI
 
         private void MeasureDimensions(AppConfig cfg, NetworkStats stats, float dpiScale, out int width, out int height)
         {
-            int baseHeight = DpiHelper.Scale(40, dpiScale); // Taskbar height is 48px
+            int baseHeight = cfg.IsFloatingMode ? DpiHelper.Scale(36, dpiScale) : DpiHelper.Scale(40, dpiScale); // Taskbar height is 48px
             int padX = DpiHelper.Scale(cfg.PaddingX, dpiScale);
             int padY = DpiHelper.Scale(cfg.PaddingY, dpiScale);
 
@@ -291,6 +331,11 @@ namespace MetriX.UI
                 }
             }
 
+            if (cfg.IsFloatingMode)
+            {
+                width += DpiHelper.Scale(12, dpiScale);
+            }
+
             // Minimum width safeguard
             width = Math.Max(width, DpiHelper.Scale(50, dpiScale));
         }
@@ -323,23 +368,43 @@ namespace MetriX.UI
                     g.InterpolationMode = InterpolationMode.HighQualityBicubic;
                     g.Clear(Color.Transparent);
 
-                    // Fill entire bounds with imperceptible Alpha=1 floor.
-                    // This prevents the cursor from falling through Alpha=0 pixels to Shell_TrayWnd,
-                    // which causes Windows 11 taskbar to fight for focus and flicker/vanish.
-                    using (Brush hitTestBrush = new SolidBrush(Color.FromArgb(1, 0, 0, 0)))
+                    if (cfg.IsFloatingMode)
                     {
-                        g.FillRectangle(hitTestBrush, 0, 0, width, height);
-                    }
-
-                    // Hover highlight (Windows 11 subtle rounded pill)
-                    if (_isHovered && cfg.ShowHoverHighlight)
-                    {
-                        using (GraphicsPath path = CreateRoundedRect(new Rectangle(2, 4, width - 4, height - 8), 5))
-                        using (Brush hoverBrush = new SolidBrush(Color.FromArgb(20, 255, 255, 255)))
-                        using (Pen hoverPen = new Pen(Color.FromArgb(30, 255, 255, 255), 1))
+                        Rectangle widgetRect = new Rectangle(1, 1, width - 2, height - 2);
+                        using (GraphicsPath path = CreateRoundedRect(widgetRect, 8))
                         {
-                            g.FillPath(hoverBrush, path);
-                            g.DrawPath(hoverPen, path);
+                            int bgAlpha = (int)(255 * (cfg.OverallOpacityPercent / 100f));
+                            using (Brush widgetBg = new SolidBrush(Color.FromArgb(Math.Min(255, Math.Max(180, bgAlpha)), 24, 24, 28)))
+                            {
+                                g.FillPath(widgetBg, path);
+                            }
+                            Color borderColor = _isHovered ? Color.FromArgb(0, 120, 215) : Color.FromArgb(60, 60, 68);
+                            using (Pen widgetPen = new Pen(borderColor, 1))
+                            {
+                                g.DrawPath(widgetPen, path);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Fill entire bounds with imperceptible Alpha=1 floor.
+                        // This prevents the cursor from falling through Alpha=0 pixels to Shell_TrayWnd,
+                        // which causes Windows 11 taskbar to fight for focus and flicker/vanish.
+                        using (Brush hitTestBrush = new SolidBrush(Color.FromArgb(1, 0, 0, 0)))
+                        {
+                            g.FillRectangle(hitTestBrush, 0, 0, width, height);
+                        }
+
+                        // Hover highlight (Windows 11 subtle rounded pill)
+                        if (_isHovered && cfg.ShowHoverHighlight)
+                        {
+                            using (GraphicsPath path = CreateRoundedRect(new Rectangle(2, 4, width - 4, height - 8), 5))
+                            using (Brush hoverBrush = new SolidBrush(Color.FromArgb(20, 255, 255, 255)))
+                            using (Pen hoverPen = new Pen(Color.FromArgb(30, 255, 255, 255), 1))
+                            {
+                                g.FillPath(hoverBrush, path);
+                                g.DrawPath(hoverPen, path);
+                            }
                         }
                     }
 
@@ -588,11 +653,18 @@ namespace MetriX.UI
             }
             else if (e.Button == MouseButtons.Left)
             {
-                if ((Control.ModifierKeys & Keys.Control) == Keys.Control)
+                var cfg = _configService.Config;
+                if (cfg.IsFloatingMode)
                 {
                     _isDragging = true;
                     _dragStartPoint = Cursor.Position;
-                    _initialOffsetX = _configService.Config.OffsetX;
+                    _initialWindowLocation = new Point(cfg.FloatingX, cfg.FloatingY);
+                }
+                else if ((Control.ModifierKeys & Keys.Control) == Keys.Control)
+                {
+                    _isDragging = true;
+                    _dragStartPoint = Cursor.Position;
+                    _initialOffsetX = cfg.OffsetX;
                 }
             }
         }
@@ -603,9 +675,33 @@ namespace MetriX.UI
 
             if (_isDragging && (e.Button & MouseButtons.Left) == MouseButtons.Left)
             {
-                int deltaX = Cursor.Position.X - _dragStartPoint.X;
-                _configService.Config.OffsetX = _initialOffsetX + deltaX;
-                RenderFrame();
+                var cfg = _configService.Config;
+                if (cfg.IsFloatingMode)
+                {
+                    int dx = Cursor.Position.X - _dragStartPoint.X;
+                    int dy = Cursor.Position.Y - _dragStartPoint.Y;
+                    int newX = _initialWindowLocation.X + dx;
+                    int newY = _initialWindowLocation.Y + dy;
+
+                    // Screen edge snapping (16px snap threshold)
+                    Screen screen = Screen.FromPoint(new Point(newX, newY));
+                    Rectangle workArea = screen.WorkingArea;
+                    const int SNAP = 16;
+                    if (Math.Abs(newX - workArea.Left) <= SNAP) newX = workArea.Left + 8;
+                    else if (Math.Abs((newX + Width) - workArea.Right) <= SNAP) newX = workArea.Right - Width - 8;
+                    if (Math.Abs(newY - workArea.Top) <= SNAP) newY = workArea.Top + 8;
+                    else if (Math.Abs((newY + Height) - workArea.Bottom) <= SNAP) newY = workArea.Bottom - Height - 8;
+
+                    cfg.FloatingX = newX;
+                    cfg.FloatingY = newY;
+                    RenderFrame();
+                }
+                else
+                {
+                    int deltaX = Cursor.Position.X - _dragStartPoint.X;
+                    cfg.OffsetX = _initialOffsetX + deltaX;
+                    RenderFrame();
+                }
             }
         }
 
@@ -613,21 +709,26 @@ namespace MetriX.UI
         {
             base.OnMouseUp(e);
 
-            if (_isDragging)
+            int dist = Math.Abs(Cursor.Position.X - _dragStartPoint.X) + Math.Abs(Cursor.Position.Y - _dragStartPoint.Y);
+            if (_isDragging && dist > 4)
             {
                 _isDragging = false;
                 _configService.Save(_configService.Config);
             }
-            else if (e.Button == MouseButtons.Left)
+            else
             {
-                var action = _configService.Config.LeftClickAction;
-                if (action == LeftClickAction.Flyout)
+                _isDragging = false;
+                if (e.Button == MouseButtons.Left)
                 {
-                    if (RequestToggleFlyout != null) RequestToggleFlyout();
-                }
-                else if (action == LeftClickAction.TaskManager)
-                {
-                    LaunchTaskManager();
+                    var action = _configService.Config.LeftClickAction;
+                    if (action == LeftClickAction.Flyout)
+                    {
+                        if (RequestToggleFlyout != null) RequestToggleFlyout();
+                    }
+                    else if (action == LeftClickAction.TaskManager)
+                    {
+                        LaunchTaskManager();
+                    }
                 }
             }
         }
@@ -648,13 +749,45 @@ namespace MetriX.UI
                 try
                 {
                     NativeMethods.WINDOWPOS wp = (NativeMethods.WINDOWPOS)Marshal.PtrToStructure(m.LParam, typeof(NativeMethods.WINDOWPOS));
+
+                    // Show Desktop Anti-Flicker Immunity:
+                    // Windows shell sends SWP_HIDEWINDOW when clicking the far-right taskbar line ("Show Desktop") or Win+D.
+                    // If docked on a visible taskbar, strip SWP_HIDEWINDOW and ensure SWP_SHOWWINDOW so the meter never flickers or disappears.
+                    if (!_configService.Config.IsFloatingMode && (_taskbarTracker == null || !_taskbarTracker.IsTaskbarHidden))
+                    {
+                        if ((wp.flags & NativeMethods.SWP_HIDEWINDOW) != 0)
+                        {
+                            wp.flags &= ~NativeMethods.SWP_HIDEWINDOW;
+                            wp.flags |= NativeMethods.SWP_SHOWWINDOW;
+                        }
+                    }
+
                     if ((wp.flags & NativeMethods.SWP_NOZORDER) == 0 && wp.hwndInsertAfter != NativeMethods.HWND_TOPMOST)
                     {
                         wp.hwndInsertAfter = NativeMethods.HWND_TOPMOST;
-                        Marshal.StructureToPtr(wp, m.LParam, false);
                     }
+                    Marshal.StructureToPtr(wp, m.LParam, false);
                 }
                 catch { }
+            }
+
+            if (m.Msg == NativeMethods.WM_SHOWWINDOW)
+            {
+                // Suppress hide request dispatched by Show Desktop / Win+D
+                if (m.WParam == IntPtr.Zero && !_configService.Config.IsFloatingMode && (_taskbarTracker == null || !_taskbarTracker.IsTaskbarHidden))
+                {
+                    m.Result = IntPtr.Zero;
+                    return;
+                }
+            }
+
+            if (m.Msg == NativeMethods.WM_SYSCOMMAND && (m.WParam.ToInt32() & 0xFFF0) == NativeMethods.SC_MINIMIZE)
+            {
+                if (!_configService.Config.IsFloatingMode)
+                {
+                    m.Result = IntPtr.Zero;
+                    return;
+                }
             }
 
             if (m.Msg == (int)_msgTaskbarCreated)

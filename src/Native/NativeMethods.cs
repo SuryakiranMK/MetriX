@@ -27,6 +27,11 @@ namespace MetriX.Native
         public const uint SWP_NOZORDER = 0x0004;
         public const uint SWP_NOACTIVATE = 0x0010;
         public const uint SWP_SHOWWINDOW = 0x0040;
+        public const uint SWP_HIDEWINDOW = 0x0080;
+
+        public const int WM_SHOWWINDOW = 0x0018;
+        public const int WM_SYSCOMMAND = 0x0112;
+        public const int SC_MINIMIZE = 0xF020;
 
         public const int WM_NCHITTEST = 0x0084;
         public const int HTCLIENT = 1;

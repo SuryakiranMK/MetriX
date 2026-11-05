@@ -34,6 +34,7 @@ namespace MetriX.UI
         private FluentNumericStepper _stepperOffsetX;
         private FluentNumericStepper _stepperOffsetY;
         private FluentToggleSwitch _toggleAllMonitors;
+        private FluentToggleSwitch _toggleFloatingMode;
 
         // Controls - Page 1: Typography & Colors
         private FluentDropdown _cbFont;
@@ -143,7 +144,11 @@ namespace MetriX.UI
                 StartWithWindows = src.StartWithWindows,
                 LeftClickAction = src.LeftClickAction,
                 ShowOnAllMonitors = src.ShowOnAllMonitors,
-                MonthlyDataQuotaGb = src.MonthlyDataQuotaGb
+                MonthlyDataQuotaGb = src.MonthlyDataQuotaGb,
+                IsFloatingMode = src.IsFloatingMode,
+                FloatingX = src.FloatingX,
+                FloatingY = src.FloatingY,
+                FloatingAlwaysOnTop = src.FloatingAlwaysOnTop
             };
         }
 
@@ -471,6 +476,15 @@ namespace MetriX.UI
             };
             page.Controls.Add(new FluentSettingCard("Multi-Monitor Mirroring", "Mirror synchronized indicator on all secondary display taskbars", _toggleAllMonitors) { Location = new Point(0, y) });
             y += 72;
+
+            // Card 6: Detachable Floating Mini-Widget
+            _toggleFloatingMode = new FluentToggleSwitch();
+            _toggleFloatingMode.CheckedChanged += (s, e) =>
+            {
+                _workingConfig.IsFloatingMode = _toggleFloatingMode.Checked;
+            };
+            page.Controls.Add(new FluentSettingCard("Detachable Floating Mini-Widget", "Detach meter from taskbar into a draggable desktop widget", _toggleFloatingMode) { Location = new Point(0, y) });
+            y += 72;
         }
 
         private void BuildStyleCards(Panel page)
@@ -772,7 +786,7 @@ namespace MetriX.UI
             };
             btnCheckUpdates.FlatAppearance.BorderSize = 0;
 
-            var cardUpdates = new FluentSettingCard("Application Updates", "metriX v2.7.0 • Up to date", btnCheckUpdates) { Location = new Point(0, y) };
+            var cardUpdates = new FluentSettingCard("Application Updates", "metriX v2.8.0 • Up to date", btnCheckUpdates) { Location = new Point(0, y) };
             btnCheckUpdates.Click += (s, e) =>
             {
                 if (_updateService == null) return;
@@ -1065,6 +1079,7 @@ namespace MetriX.UI
             _stepperDataQuota.Value = (decimal)_workingConfig.MonthlyDataQuotaGb;
             _toggleStartWithWindows.Checked = _workingConfig.StartWithWindows;
             if (_toggleSilentUpdate != null) _toggleSilentUpdate.Checked = _workingConfig.EnableSilentAutoUpdate;
+            if (_toggleFloatingMode != null) _toggleFloatingMode.Checked = _workingConfig.IsFloatingMode;
         }
 
         private void OnPreviewPaint(object sender, PaintEventArgs e)
@@ -1175,6 +1190,10 @@ namespace MetriX.UI
             if (_toggleSilentUpdate != null)
             {
                 _workingConfig.EnableSilentAutoUpdate = _toggleSilentUpdate.Checked;
+            }
+            if (_toggleFloatingMode != null)
+            {
+                _workingConfig.IsFloatingMode = _toggleFloatingMode.Checked;
             }
             _configService.Save(_workingConfig);
             if (_onSettingsUpdated != null) _onSettingsUpdated();
