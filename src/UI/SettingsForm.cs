@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
@@ -256,7 +257,8 @@ namespace MetriX.UI
                 new NavItemDef("\uE707", "Position"),
                 new NavItemDef("\uE790", "Typography"),
                 new NavItemDef("\uE947", "Spacing"),
-                new NavItemDef("\uE713", "System")
+                new NavItemDef("\uE713", "System"),
+                new NavItemDef("\uE946", "About")
             };
 
             int btnY = 75;
@@ -416,6 +418,12 @@ namespace MetriX.UI
             BuildSystemCards(pageSystem);
             _pages.Add(pageSystem);
             _contentContainer.Controls.Add(pageSystem);
+
+            // Page 4: About & Privacy
+            var pageAbout = CreateScrollablePage(pageY, pageH);
+            BuildAboutCards(pageAbout);
+            _pages.Add(pageAbout);
+            _contentContainer.Controls.Add(pageAbout);
 
             Controls.Add(_contentContainer);
         }
@@ -921,6 +929,107 @@ namespace MetriX.UI
                 _workingConfig.EnableSilentAutoUpdate = _toggleSilentUpdate.Checked;
             };
             y = AddSettingCard(page, new FluentSettingCard("Silent Auto-Update", "Automatically download and apply updates without prompting", _toggleSilentUpdate), y);
+
+            page.UpdateScrollRange();
+        }
+
+        private void BuildAboutCards(FluentScrollablePage page)
+        {
+            int y = 0;
+
+            // Card 1: App Header & Version
+            var btnGithub = new Button
+            {
+                Text = "GitHub ↗",
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(45, 45, 52),
+                FlatStyle = FlatStyle.Flat,
+                Size = new Size(110, 30),
+                Cursor = Cursors.Hand,
+                UseMnemonic = false,
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            btnGithub.FlatAppearance.BorderColor = Color.FromArgb(70, 70, 78);
+            btnGithub.Click += (s, e) =>
+            {
+                try { Process.Start(new ProcessStartInfo { FileName = "https://github.com/SuryakiranMK/MetriX", UseShellExecute = true }); } catch { }
+            };
+
+            string ver = UpdateService.GetCurrentAssemblyVersion().ToString();
+            y = AddSettingCard(page, new FluentSettingCard("metriX v" + ver, "Super simple, ultra-lightweight real-time network speed indicator & HUD for Windows 11", btnGithub), y);
+
+            // Card 2: 0 Internet Needed for Monitoring (100% Offline & Private)
+            var badgeOffline = new Label
+            {
+                Text = "100% OFFLINE",
+                Font = new Font("Segoe UI", 7.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(108, 203, 95),
+                BackColor = Color.FromArgb(30, 48, 35),
+                Size = new Size(110, 26),
+                TextAlign = ContentAlignment.MiddleCenter,
+                UseMnemonic = false
+            };
+            y = AddSettingCard(page, new FluentSettingCard("0 Internet Required for Monitoring", "Queries local OS kernel NDIS tables directly via Win32 IP Helper (iphlpapi.dll). Zero internet connection needed for speed telemetry. Fully functional in air-gapped systems, airplane mode, and local offline networks with 100% privacy and zero tracking.", badgeOffline), y);
+
+            // Card 3: Ultra-Lightweight & Zero-Allocation Engine
+            var badgePerf = new Label
+            {
+                Text = "< 4 MB RAM",
+                Font = new Font("Segoe UI", 7.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(76, 194, 255),
+                BackColor = Color.FromArgb(25, 40, 55),
+                Size = new Size(110, 26),
+                TextAlign = ContentAlignment.MiddleCenter,
+                UseMnemonic = false
+            };
+            y = AddSettingCard(page, new FluentSettingCard("Ultra-Lightweight & Zero-Allocation Engine", "Runs at < 0.01% CPU usage (~1.5 µs kernel query time) and < 4–6 MB RAM physical working set with automated CLR trim. Features persistent GDI handle caching, zero-leak DIB frame buffers, and single standalone ~216 KB binary with zero external dependencies.", badgePerf), y);
+
+            // Card 4: Display-Only (Click-Through HUD) Mode
+            var badgeHud = new Label
+            {
+                Text = "HUD MODE",
+                Font = new Font("Segoe UI", 7.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(255, 185, 0),
+                BackColor = Color.FromArgb(50, 42, 20),
+                Size = new Size(110, 26),
+                TextAlign = ContentAlignment.MiddleCenter,
+                UseMnemonic = false
+            };
+            y = AddSettingCard(page, new FluentSettingCard("Display-Only HUD & Global Shortcut", "Make the indicator transparent to clicks (WS_EX_TRANSPARENT) so mouse actions pass straight through to underlying applications/games without interference. Press your global shortcut (Ctrl + ` default) anywhere in Windows to restore interactivity.", badgeHud), y);
+
+            // Card 5: Free Taskbar Dragging & Detachable Floating Widget
+            var badgeWidget = new Label
+            {
+                Text = "SNAP & FLOAT",
+                Font = new Font("Segoe UI", 7.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(180, 160, 255),
+                BackColor = Color.FromArgb(40, 35, 55),
+                Size = new Size(110, 26),
+                TextAlign = ContentAlignment.MiddleCenter,
+                UseMnemonic = false
+            };
+            y = AddSettingCard(page, new FluentSettingCard("Free Drag Positioning & Floating Widget", "Directly drag and drop the indicator anywhere along your taskbar with the left mouse button, or detach into a floating desktop widget with 80%–150% scaling, always-on-top, and position locking. Synchronized mirroring on all secondary monitors.", badgeWidget), y);
+
+            // Card 6: Community & License
+            var btnReleases = new Button
+            {
+                Text = "Releases ↗",
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
+                ForeColor = Color.White,
+                BackColor = Color.FromArgb(45, 45, 52),
+                FlatStyle = FlatStyle.Flat,
+                Size = new Size(110, 30),
+                Cursor = Cursors.Hand,
+                UseMnemonic = false,
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            btnReleases.FlatAppearance.BorderColor = Color.FromArgb(70, 70, 78);
+            btnReleases.Click += (s, e) =>
+            {
+                try { Process.Start(new ProcessStartInfo { FileName = "https://github.com/SuryakiranMK/MetriX/releases", UseShellExecute = true }); } catch { }
+            };
+            y = AddSettingCard(page, new FluentSettingCard("Open Source & Architecture", "Licensed under MIT License • Copyright © 2026 Suryakiran MK.\nCrafted with C# & Win32 P/Invoke specifically for Windows 11.", btnReleases), y);
 
             page.UpdateScrollRange();
         }
